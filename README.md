@@ -1,65 +1,110 @@
-Architect (Life OS)
-Um "Segundo Cérebro" digital. Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro.
+Architec (Life OS)
 
-Sobre o Projeto
-O Architect não é apenas uma lista de tarefas. É um ERP Pessoal projetado para resolver a fragmentação da vida digital. Em vez de usar 3 apps separados (Notion para notas, Todoist para tarefas, Excel para finanças), o Architect unifica esses domínios através de um banco de dados relacional robusto.
+Um “Segundo Cérebro” digital.
+Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro, unificando múltiplos domínios da vida pessoal em uma única arquitetura de software.
 
-O objetivo técnico deste projeto é explorar arquiteturas de software de nível Pleno, focando em:
+O Architec não é apenas uma lista de tarefas.
+Ele é um ERP Pessoal, projetado para resolver a fragmentação da vida digital.
 
-Complexidade de Dados: Recursividade (WBS), Grafos de Dependência e Séries Temporais.
+Em vez de usar ferramentas separadas como:
+Notion → conhecimento
+Todoist → tarefas
+Excel → finanças
+O Architec unifica tudo através de um modelo de dados relacional robusto, onde informação, execução e recursos financeiros se conectam.
+Este projeto foi desenvolvido como exercício de engenharia de software, simulando desafios reais encontrados em sistemas de mercado.
 
-Integridade: Regras de negócio fortes no Backend (NestJS) e consistência no Banco (PostgreSQL).
+Objetivo de Engenharia:
 
-Escalabilidade: Estrutura pronta para crescer (Monorepo, Docker).
+Complexidade de Dados:
+Estruturas recursivas (WBS – Work Breakdown Structure)
+Grafos de dependência entre tarefas
+Modelagem de séries temporais para dados financeiros
+
+Integridade de Sistema:
+Regras de negócio centralizadas no backend (NestJS)
+Consistência garantida no banco relacional (PostgreSQL)
+Validações estruturais e relacionais
+
+Escalabilidade:
+Arquitetura preparada para crescimento
+Estrutura em monorepo
+Ambiente isolado via Docker
+Separação clara entre domínios
 
 Tech Stack
 O projeto utiliza uma stack moderna focada em performance e tipagem estática.
 
-Backend & Infra
-NestJS - Framework Node.js progressivo.
 
-PostgreSQL - Banco de dados relacional.
+Arquitetura
 
-Prisma ORM - Type-safe database client.
+O sistema segue princípios de separação de responsabilidades:
 
-Docker - Containerização do ambiente de desenvolvimento.
+Camada	Responsabilidade
+Frontend	Interface e experiência do usuário
+Backend	Regras de negócio, validações, integrações
+Banco de Dados	Consistência relacional e integridade dos dados
 
-Frontend
-React (Vite) - Biblioteca de UI.
+Fluxo geral:
 
-TypeScript - Estabilidade e tipagem.
+Frontend (React) → API REST (NestJS) → PostgreSQL
 
-TailwindCSS + Shadcn/ui - Estilização e Componentes.
+O backend é responsável por proteger a lógica do sistema, evitando que regras críticas fiquem no cliente.
 
-Zustand - Gerenciamento de estado leve.
+Tech Stack
+Backend & Infra:
 
-🧩 Módulos do Sistema
-1. 🧠 Knowledge (Conhecimento)
-Sistema de notas estilo Zettelkasten.
+NestJS — Framework Node.js estruturado e escalável
+PostgreSQL — Banco de dados relacional
+Prisma ORM — Acesso type-safe ao banco
+Docker — Containerização do ambiente
 
-[ ] Editor de Texto Rico (Markdown suporte).
+Frontend:
 
-[ ] Links bidirecionais entre notas.
+React (Vite) — UI moderna e performática
+TypeScript — Tipagem estática e segurança
+TailwindCSS + Shadcn/ui — Design system e componentes
+Zustand — Gerenciamento de estado leve
 
-[ ] Sistema de Tags hierárquicas.
+Módulos do Sistema
 
-2. ✅ Execution (Execução)
-Gestão de projetos avançada.
+1. Knowledge
+Sistema de notas inspirado no método Zettelkasten.
 
-[ ] Árvore de Tarefas Infinita (WBS) - Algoritmo Recursivo.
+Editor de texto rico (suporte a Markdown)
+Links bidirecionais entre notas
+Sistema de tags hierárquicas
 
-[ ] Dependência entre tarefas (Bloqueios).
+2. Execution
+Gestão de projetos com foco em estrutura e dependências.
 
-[ ] Integração com Calendário (Time Blocking).
+ Árvore de tarefas infinita (WBS – algoritmo recursivo)
+ Dependência entre tarefas (bloqueios)
+ Integração com calendário (time blocking)
 
-3. 💰 Resources (Financeiro)
-Gestão de fluxo de caixa.
+4. Resources
+Controle de fluxo de caixa integrado ao restante do sistema.
 
-[ ] Contas a pagar/receber.
+ Contas a pagar e receber
+ Recorrência automática de despesas
+ Dashboards de projeção financeira
 
-[ ] Recorrência automática de despesas.
+Status do Projeto:
+O projeto está em desenvolvimento contínuo, com foco em:
+-Evolução da modelagem de dados
+-Implementação das regras de negócio
+-Integração progressiva entre os domínios
 
-[ ] Dashboards de projeção financeira.
+Por que este projeto existe?
+
+Este repositório faz parte do meu portfólio como engenheiro de software.
+Grande parte dos sistemas que desenvolvo profissionalmente são privados, então o Architec foi criado para demonstrar:
+
+-Capacidade de modelar sistemas complexos
+-Organização arquitetural
+-Pensamento orientado a domínio
+-Boas práticas de backend e banco de dados
+
+
 
 
 Desenvolvido com 💙 por MatheusJuski como parte do portfólio de Engenharia de Software.
