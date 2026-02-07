@@ -1,7 +1,7 @@
-🏛️ Architect (Life OS)
+Architect (Life OS)
 Um "Segundo Cérebro" digital. Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro.
 
-🎯 Sobre o Projeto
+Sobre o Projeto
 O Architect não é apenas uma lista de tarefas. É um ERP Pessoal projetado para resolver a fragmentação da vida digital. Em vez de usar 3 apps separados (Notion para notas, Todoist para tarefas, Excel para finanças), o Architect unifica esses domínios através de um banco de dados relacional robusto.
 
 O objetivo técnico deste projeto é explorar arquiteturas de software de nível Pleno, focando em:
@@ -12,7 +12,7 @@ Integridade: Regras de negócio fortes no Backend (NestJS) e consistência no Ba
 
 Escalabilidade: Estrutura pronta para crescer (Monorepo, Docker).
 
-🚀 Tech Stack
+Tech Stack
 O projeto utiliza uma stack moderna focada em performance e tipagem estática.
 
 Backend & Infra
