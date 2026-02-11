@@ -36,3 +36,15 @@ Thumbs.db
 
 coverage/
 __snapshots__/
+
+# Prisma
+/apps/api/prisma/*.db
+/apps/api/prisma/*.db-journal
+
+# NestJS / TypeScript
+/apps/api/dist/
+*.tsbuildinfo
+
+# Logs e Cache do Docker
+.docker/
+docker/pgdata/
