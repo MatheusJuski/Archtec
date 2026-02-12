@@ -1,55 +1,55 @@
-import { Injectable, ConflictException } from '@nestjs/common';
-import { CreateUserDto } from './dto/create-user.dto';
-import * as bcrypt from 'bcrypt';
+import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpdateUserDto } from './dto/update-user.dto';
+import { CreateUserDto } from './dto/create-user.dto';
+import { LoginDto } from './dto/login.dto';
+import * as bcrypt from 'bcrypt';
+import { JwtService } from '@nestjs/jwt'; 
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService, 
+    private jwtService: JwtService
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     const { email, password, name } = createUserDto;
 
-    // 1. Verifica duplicidade
-    const userExists = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
+    const userExists = await this.prisma.user.findUnique({ where: { email } });
     if (userExists) {
-      throw new ConflictException('User already exists');
+      throw new ConflictException('E-mail já cadastrado');
     }
 
-    // 2. Hash da Senha
-    const salt = 10;
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    // 3. Cria no Banco
     const user = await this.prisma.user.create({
-      data: {
-        name,
-        email,
-        password: hashedPassword,
-      },
+      data: { email, name, password: hashedPassword },
     });
 
-    // 4. Retorna sem a senha
-    const { password: _, ...result } = user;
-    return result;
-  }
-  findAll() {
-    return `This action returns all users`;
+    const { password: _, ...userWithoutPassword } = user;
+    return userWithoutPassword;
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} user`;
-  }
+  async login(loginDto: LoginDto) {
+    const { email, password } = loginDto;
 
-  update(id: number, updateUserDto: UpdateUserDto) {
-    return `This action updates a #${id} user`;
-  }
+    const user = await this.prisma.user.findUnique({ where: { email } });
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      throw new UnauthorizedException('Credenciais inválidas');
+    }
+
+    // O Payload é o que "viaja" dentro do token. 
+    // 'sub' é uma convenção para o ID do usuário.
+    const payload = { email: user.email, sub: user.id };
+  
+    return {
+      access_token: this.jwtService.sign(payload),
+      user: { 
+        id: user.id, 
+        email: user.email,
+        name: user.name 
+      }
+    };
   }
 }
