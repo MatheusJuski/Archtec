@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
+import { useAuthStore } from "@/store/auth"
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -25,34 +26,26 @@ type LoginValues = z.infer<typeof loginSchema>
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
+  const signIn = useAuthStore((state) => state.signIn)
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   })
 
-async function onSubmit(data: LoginValues) {
-  setIsLoading(true)
-  try {
-    // 1. Chamada Real para o NestJS
-    const response = await api.post("/users/login", data)
-    
-    // 2. Salvar o Token no navegador
-    const token = response.data.access_token
-    localStorage.setItem("architect-token", token)
-    
-    // 3. Feedback e Redirecionamento (futuro)
-    toast.success("Login realizado com sucesso!")
-    console.log("Token salvo:", token)
-    
-  } catch (error) {
-    // Tratamento de erro robusto
-    console.error(error)
-    toast.error("Email ou senha incorretos")
-  } finally {
-    setIsLoading(false)
+  async function onSubmit(data: LoginValues) {
+    setIsLoading(true)
+    try {
+      const response = await api.post("/users/login", data)
+      signIn(response.data.access_token)
+      toast.success("Login realizado com sucesso!")
+    } catch (error) {
+      console.error(error)
+      toast.error("Credenciais inválidas")
+    } finally {
+      setIsLoading(false)
+    }
   }
-}
 
   return (
     <Card className="w-[350px]">
