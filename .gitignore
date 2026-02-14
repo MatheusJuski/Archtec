@@ -1,50 +1,54 @@
+# ------------------------------------------------------
+# 📦 Dependências e Logs (Node.js Global)
+# ------------------------------------------------------
 node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.pnpm-store/
 
-
+# ------------------------------------------------------
+# 🏗️ Build e Distribuição (Frontend & Backend)
+# ------------------------------------------------------
+# Ignora pastas de build em qualquer nível (api ou web)
 dist/
 build/
 out/
-.next/
+coverage/
 *.tsbuildinfo
 
+# Vite (Frontend)
+.vite/
 
+# ------------------------------------------------------
+# 🔐 Segurança e Variáveis de Ambiente
+# ------------------------------------------------------
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-*.pem
-
+.env.*
 !.env.example
+*.pem
+*.key
 
-
+# ------------------------------------------------------
+# 🐳 Docker e Banco de Dados
+# ------------------------------------------------------
+# Dados persistentes do Postgres (CRÍTICO: não enviar para o Git)
 docker/pgdata/
 .docker/
 
+# Arquivos locais do Prisma (caso use SQLite em testes)
+*.db
+*.db-journal
+
+# ------------------------------------------------------
+# 🖥️ IDE e Sistema Operacional
+# ------------------------------------------------------
 .DS_Store
 Thumbs.db
 .idea/
 .vscode/
 *.swp
 *.swo
-
-
-coverage/
-__snapshots__/
-
-# Prisma
-/apps/api/prisma/*.db
-/apps/api/prisma/*.db-journal
-
-# NestJS / TypeScript
-/apps/api/dist/
-*.tsbuildinfo
-
-# Logs e Cache do Docker
-.docker/
-docker/pgdata/
+.history/
