@@ -14,6 +14,28 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  notes   Note[]
 
   @@map("users")
+}
+
+model Note {
+  id       String   @id @default(uuid())
+  title   String
+  content String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags     Tag[]
+
+  @@map("notes")
+}
+
+model Tag{
+  id String @id @default(uuid())
+  name String @unique
+  notes Note[]
+
+  @@map("tags")
 }
