@@ -3,6 +3,7 @@ import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard'; 
+import { ParseUUIDPipe } from '@nestjs/common';
 
 @Controller('notes')
 @UseGuards(JwtAuthGuard) 
@@ -25,13 +26,20 @@ export class NotesController {
     return this.notesService.findOne(+id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateNoteDto: UpdateNoteDto) {
-    return this.notesService.update(+id, updateNoteDto);
+@Patch(':id')
+  update(
+    @Request() req,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() updateNoteDto: UpdateNoteDto,
+  ) {
+    return this.notesService.update(id, req.user.userId, updateNoteDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.notesService.remove(+id);
+@Delete(':id')
+  remove(
+    @Request() req, 
+    @Param('id', ParseUUIDPipe) id: string
+  ) {
+    return this.notesService.remove(id, req.user.userId);
   }
 }
