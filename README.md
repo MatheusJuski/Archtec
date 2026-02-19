@@ -16,7 +16,7 @@ Em vez de usar ferramentas separadas:
 
 O Architec unifica esses domínios por meio de um modelo de dados relacional robusto, onde informação, execução e recursos financeiros se conectam.
 
-Este projeto foi desenvolvido como exercício de engenharia de software, simulando desafios reais encontrados em sistemas de mercado.
+Este projeto está em desenvolvimento como exercício de engenharia de software, simulando desafios reais encontrados em sistemas de mercado.
 
 ---
 
