@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/Login";
-import { Dashboard } from "@/pages/Dashboard";
+import { NotesPage } from "@/pages/NotesPage";
 import { AuthGuard } from "@/components/AuthGuard";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -18,7 +18,7 @@ function App() {
 
           {/* Rota Privada (Dashboard) */}
           <Route element={<AuthGuard isPrivate={true} />}>
-            <Route path="/" element={<Dashboard />} />
+            <Route path="/" element={<NotesPage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/login" replace />} />
