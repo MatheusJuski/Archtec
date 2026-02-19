@@ -21,21 +21,21 @@ export function LoginPage() {
   );
 
   // Seus slides com as imagens personalizadas
-  const slides = [
+const slides = [
     {
-      image: "/aaaaa.jpg",
+      image: "https://images.unsplash.com/photo-1507413245164-6160d8298b31?q=80&w=2070&auto=format&fit=crop",
       title: "Centralize suas ideias",
-      description: "Tudo o que você precisa, em um único lugar."
+      description: "Um Segundo Cérebro digital baseado no método Zettelkasten para gestão de conhecimento."
     },
     {
-      image: "/a4eab7f0b7c741bd945cf11020c0bd97~tplv-jj85edgx6n-image-origin.jpeg",
+      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop",
       title: "Foco no que importa",
-      description: "Um editor limpo e poderoso para o seu fluxo."
+      description: "Gestão de projetos com árvores de tarefas infinitas e grafos de dependência."
     },
     {
-      image: "/5itu8ncfmwif1.png",
-      title: "Segurança total",
-      description: "Seus dados criptografados de ponta a ponta."
+      image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2000",
+      title: "Controle total",
+      description: "Unifique finanças, execução e conhecimento em uma única arquitetura de software."
     }
   ];
 
