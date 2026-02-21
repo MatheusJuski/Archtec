@@ -29,7 +29,7 @@ export function NoteCard({ note, onDelete }: NoteCardProps) {
     <div className="flex flex-col justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:border-slate-700 hover:shadow-md h-full">
       <div className="space-y-4">
         <div className="space-y-1">
-          <h3 className="font-semibold leading-none tracking-tight text-slate-100">
+          <h3 className="font-oswald font-bold uppercase tracking-wider text-slate-100">
             {note.title}
           </h3>
           <p className="text-xs text-slate-500">

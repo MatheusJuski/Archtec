@@ -5,7 +5,12 @@ export default {
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        sans: ['Oswald', 'sans-serif'],
+        oswald: ['Oswald', 'sans-serif'],
+      },
+    },
   },
   plugins: [
     typography,
