@@ -116,9 +116,7 @@ export function LoginPage() {
 
       </div>
 
-      {/* --- COLUNA DIREITA (Formulário com Gradiente Sutil) --- */}
-      {/* Aqui aplicamos um gradiente radial/mesh sutil focado no fundo escuro do tema */}
-{/* --- COLUNA DIREITA (Formulário com Gradiente Confortável) --- */}
+      {/* --- COLUNA DIREITA --- */}
       <div className="relative flex items-center justify-center p-8 h-full overflow-hidden bg-background">
         
         {/* Efeito Aurora 1: Luz azulada suave no canto superior direito */}

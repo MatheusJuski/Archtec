@@ -29,9 +29,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
     editable,
     editorProps: {
       attributes: {
-        // CORREÇÃO DE FONTE E COR:
-        // font-sans (Inter) no corpo, [&_h1,h2]:font-heading (Oswald) nos títulos
-        class: "font-sans prose prose-invert prose-base sm:prose-lg max-w-none focus:outline-none min-h-[150px] [&_h1]:font-heading [&_h1]:text-4xl [&_h1]:font-bold [&_h1]:mb-6 [&_h1]:mt-8 [&_h2]:font-heading [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:mb-4 [&_h2]:mt-6 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_code]:bg-slate-800/50 [&_code]:text-blue-300 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-slate-900/50 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-white/5 [&_.is-empty::before]:content-[attr(data-placeholder)] [&_.is-empty::before]:text-slate-500 [&_.is-empty::before]:float-left [&_.is-empty::before]:pointer-events-none [&_.is-empty::before]:h-0 [&_li>.is-empty::before]:hidden",
+        class: "font-sans prose prose-invert prose-base sm:prose-lg leading-relaxed max-w-[800px] focus:outline-none min-h-[150px] [&_h1]:font-heading [&_h1]:text-4xl [&_h1]:font-bold [&_h1]:mb-6 [&_h1]:mt-8 [&_h2]:font-heading [&_h2]:text-3xl [&_h2]:font-semibold [&_h2]:mb-4 [&_h2]:mt-6 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_code]:bg-slate-800/50 [&_code]:text-blue-300 [&_code]:px-1 [&_code]:rounded [&_pre]:bg-slate-900/50 [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:border [&_pre]:border-white/5 [&_.is-empty::before]:content-[attr(data-placeholder)] [&_.is-empty::before]:text-slate-500 [&_.is-empty::before]:float-left [&_.is-empty::before]:pointer-events-none [&_.is-empty::before]:h-0 [&_li>.is-empty::before]:hidden",
       },
     },
     onUpdate: ({ editor }) => {
@@ -42,15 +40,14 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
   if (!editor) return null
 
   return (
-    // Cores ajustadas para o novo tema do Architec
-    <div className="border border-white/5 rounded-xl bg-[#0a0a1a] p-6 relative group min-h-[200px] shadow-2xl">
 
+    <div className="relative group min-h-[300px] px-6 py-6 bg-white/[0.02] rounded-xl transition-all duration-300 border border-white/5 focus-within:bg-white/[0.04] focus-within:border-white/10 focus-within:shadow-2xl">
       {/* Bubble Menu (Formatação) */}
       {editor && (
         <BubbleMenu
           editor={editor}
           tippyOptions={{ duration: 100 }}
-          className="flex gap-1 bg-[#12122b] border border-white/10 p-1.5 rounded-lg shadow-2xl backdrop-blur-md"
+          className="flex gap-1 bg-[#12122b]/80 backdrop-blur-md border border-white/10 p-1.5 rounded-lg shadow-2xl"
         >
           <button onClick={() => editor.chain().focus().toggleBold().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('bold') ? 'text-blue-400' : 'text-slate-400'}`}>
             <Bold size={16} />
@@ -72,7 +69,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
         <FloatingMenu
           editor={editor}
           tippyOptions={{ duration: 100 }}
-          className="flex gap-1 bg-[#12122b] border border-white/10 p-1.5 rounded-lg shadow-2xl ml-[-45px]"
+          className="flex gap-1 bg-[#12122b]/80 backdrop-blur-md border border-white/10 p-1.5 rounded-lg shadow-2xl ml-11.25"
         >
           <button 
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} 
