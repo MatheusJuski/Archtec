@@ -10,18 +10,23 @@ function App() {
       <div className="bg-slate-950 min-h-screen text-slate-50">
         <Routes>
           
-          {/* Rota Pública (Login) */}
+          {/* 1. Rota Raiz: Redireciona direto para o painel principal */}
+          <Route path="/" element={<Navigate to="/notes" replace />} />
+
+          {/* 2. Rota Pública (Login) */}
           <Route element={<AuthGuard isPrivate={false} />}>
-            {/* Agora usamos o componente de página completa */}
             <Route path="/login" element={<LoginPage />} /> 
           </Route>
 
-          {/* Rota Privada (Dashboard) */}
+          {/* 3. Rotas Privadas (Dashboard/Architec) */}
           <Route element={<AuthGuard isPrivate={true} />}>
-            <Route path="/" element={<NotesPage />} />
+            <Route path="/notes" element={<NotesPage />} />
+            <Route path="/notes/:id" element={<NotesPage />} />
           </Route>
 
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* 4. Rota Coringa Segura: Manda para /notes em vez de /login */}
+          <Route path="*" element={<Navigate to="/notes" replace />} />
+          
         </Routes>
         
         <Toaster position="top-right" richColors />
