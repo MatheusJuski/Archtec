@@ -24,7 +24,6 @@ export function NotesPage() {
   const { id } = useParams();
   const activeNoteId = id || null;
   
-  // 🛑 TRAVA MAGNÉTICA: Guarda qual nota está oficialmente aberta no editor
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null);
 
   // Estados do Editor
@@ -60,8 +59,7 @@ export function NotesPage() {
     // Só entra aqui se a URL mudou e a nova nota ainda não foi carregada no editor
     if (loadedNoteId !== activeNoteId) {
       
-      // 🚨 SALVAMENTO DE EMERGÊNCIA (FLUSH): 
-      // Se você mudou de nota antes do auto-save terminar, salva a nota antiga na hora!
+
       if (loadedNoteId !== null) {
          const oldNote = notes.find(n => n.id === loadedNoteId);
          if (oldNote) {
@@ -78,13 +76,13 @@ export function NotesPage() {
          }
       }
 
-      // 📥 CARREGA A NOVA NOTA
+
       if (activeNoteId && notes.length > 0) {
          const selectedNote = notes.find((n) => n.id === activeNoteId);
          if (selectedNote) {
             setContent(selectedNote.content || "");
             setTags(selectedNote.tags?.map(t => typeof t === 'string' ? t : t.name) || []);
-            setLoadedNoteId(activeNoteId); // Tranca a porta com o novo ID
+            setLoadedNoteId(activeNoteId);
          }
       } else if (!activeNoteId) {
          setContent("");
@@ -112,10 +110,10 @@ export function NotesPage() {
 
   // 5. AUTO-SAVE 
   useEffect(() => {
-    // 🛑 SEGURANÇA MÁXIMA: Impede salvar na nota errada
+
     if (loadedNoteId !== activeNoteId) return;
     
-    // 🛑 Espera o usuário parar de digitar completamente
+
     if (content !== debouncedContent || tags !== debouncedTags) return;
 
     if (!activeNoteId && (!debouncedContent || debouncedContent === "<p></p>") && debouncedTags.length === 0) return;
@@ -237,6 +235,15 @@ export function NotesPage() {
             )}
           </div>
         </ScrollArea>
+        <div className="p-4 border-t border-white/5 mt-auto">
+          <Button 
+            variant="outline" 
+            onClick={signOut} 
+            className="w-full border-white/10 hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Sair
+          </Button>
+        </div>
       </aside>
 
       {/* ÁREA DO EDITOR */}
@@ -250,7 +257,7 @@ export function NotesPage() {
               </h1>
               
               <div className="flex items-center gap-2 text-sm font-sans font-medium">
-                {saveStatus === "idle" && <span className="flex items-center gap-1 text-muted-foreground"><Cloud size={16} /> Salvo</span>}
+                {saveStatus === "idle" && <span className="flex items-center gap-1 text-muted-foreground"><Cloud size={16} /> Salvo localmente</span>}
                 {saveStatus === "saving" && <span className="flex items-center gap-1 text-blue-400"><Loader2 size={16} className="animate-spin" /> Salvando...</span>}
                 {saveStatus === "saved" && <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 size={16} /> Salvo na nuvem</span>}
               </div>

@@ -51,7 +51,6 @@ export function LoginPage() {
   }, [api]);
 
   return (
-    // Removido o bg-slate-950 daqui, pois as colunas terão seus próprios fundos
     <div className="grid min-h-screen w-full lg:grid-cols-2">
       
       {/* --- COLUNA ESQUERDA (Visual com Imagem) --- */}
@@ -80,7 +79,7 @@ export function LoginPage() {
                     />
                     
                     {/* Overlay Gradient: Garante a legibilidade do texto (transição para o bg do tema) */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent" />
 
                     {/* Conteúdo Centralizado na parte inferior */}
                     <div className="absolute bottom-24 left-0 right-0 px-12 text-center z-20 flex flex-col items-center">
@@ -120,15 +119,15 @@ export function LoginPage() {
       <div className="relative flex items-center justify-center p-8 h-full overflow-hidden bg-background">
         
         {/* Efeito Aurora 1: Luz azulada suave no canto superior direito */}
-        <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-blue-600/15 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-[-10%] right-[-10%] w-125 h-125 bg-blue-600/15 blur-[120px] rounded-full pointer-events-none" />
         
         {/* Efeito Aurora 2: Luz mais escura no canto inferior esquerdo */}
-        <div className="absolute bottom-[-15%] left-[-10%] w-[600px] h-[600px] bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-[-15%] left-[-10%] w-150 h-150 bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none" />
         
         {/* Gradiente sutil central para quebrar o chapado */}
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#12122b]/30 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-linear-to-br from-transparent via-[#12122b]/30 to-transparent pointer-events-none" />
 
-        <div className="mx-auto flex w-full flex-col justify-center space-y-8 sm:w-[350px] relative z-10">
+        <div className="mx-auto flex w-full flex-col justify-center space-y-8 sm:w-87.5 relative z-10">
           
           {/* Logo Mobile */}
           <div className="lg:hidden flex items-center justify-center mb-6 text-foreground">
