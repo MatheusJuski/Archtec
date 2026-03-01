@@ -180,7 +180,7 @@ export function NotesPage() {
       {/* SIDEBAR */}
       <aside className="w-80 flex flex-col border-r border-border bg-[#05050f] shrink-0">
         <div className="p-4 border-b border-white/5 flex items-center justify-between">
-          <h2 className="font-heading text-lg font-bold text-foreground">KNOWLEDGE</h2>
+          <h2 className="font-heading text-lg font-bold text-foreground">Notas</h2>
           <Button variant="ghost" size="icon" onClick={handleResetEditor} title="Nova Nota">
             <Plus size={18} />
           </Button>
@@ -283,7 +283,7 @@ export function NotesPage() {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleKeyDownTag}
                 placeholder={tags.length === 0 ? "Adicionar tag (Aperte Enter)..." : "Nova tag..."}
-                className="bg-transparent border-none text-sm text-slate-400 focus:outline-none focus:ring-0 flex-1 min-w-[150px] font-sans h-8"
+                className="bg-transparent border-none text-sm text-slate-400 focus:outline-none focus:ring-0 flex-1 min-w-37.5 font-sans h-8"
               />
             </div>
           </header>

@@ -52,7 +52,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
 
   return (
 
-    <div className="relative group min-h-75 px-6 py-6 bg-white/[0.02] rounded-xl transition-all duration-300 border border-white/5 focus-within:bg-white/[0.04] focus-within:border-white/10 focus-within:shadow-2xl">
+    <div className="relative group min-h-75 px-6 py-6 bg-white/2 rounded-xl transition-all duration-300 border border-white/5 focus-within:bg-white/4 focus-within:border-white/10 focus-within:shadow-2xl">
       {/* Bubble Menu (Formatação) */}
       {editor && (
         <BubbleMenu
