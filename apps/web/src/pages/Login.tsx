@@ -78,7 +78,7 @@ export function LoginPage() {
                       style={{ backgroundImage: `url(${slide.image})` }}
                     />
                     
-                    {/* Overlay Gradient: Garante a legibilidade do texto (transição para o bg do tema) */}
+                    {/* Overlay Gradient */}
                     <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent" />
 
                     {/* Conteúdo Centralizado na parte inferior */}
@@ -118,13 +118,13 @@ export function LoginPage() {
       {/* --- COLUNA DIREITA --- */}
       <div className="relative flex items-center justify-center p-8 h-full overflow-hidden bg-background">
         
-        {/* Efeito Aurora 1: Luz azulada suave no canto superior direito */}
+        {/* Efeito Aurora 1 */}
         <div className="absolute top-[-10%] right-[-10%] w-125 h-125 bg-blue-600/15 blur-[120px] rounded-full pointer-events-none" />
         
-        {/* Efeito Aurora 2: Luz mais escura no canto inferior esquerdo */}
+        {/* Efeito Aurora 2 */}
         <div className="absolute bottom-[-15%] left-[-10%] w-150 h-150 bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none" />
         
-        {/* Gradiente sutil central para quebrar o chapado */}
+        {/* Gradiente sutil central */}
         <div className="absolute inset-0 bg-linear-to-br from-transparent via-[#12122b]/30 to-transparent pointer-events-none" />
 
         <div className="mx-auto flex w-full flex-col justify-center space-y-8 sm:w-87.5 relative z-10">
@@ -135,16 +135,7 @@ export function LoginPage() {
              <span className="text-2xl font-heading tracking-wide">Archtec</span>
           </div>
 
-          <div className="flex flex-col space-y-2 text-center">
-            <h1 className="font-heading text-4xl tracking-tight text-foreground">
-              BEM-VINDO DE VOLTA!
-            </h1>
-            <p className="text-sm font-sans text-muted-foreground">
-              Entre para continuar construindo.
-            </p>
-          </div>
-
-          {/* Wrapper do Formulário */}
+          {/* Wrapper do Formulário (O título dinâmico agora vive dentro do LoginForm) */}
           <div className="[&>div]:border-0 [&>div]:shadow-none [&>div]:bg-transparent [&>div]:p-0">
              <LoginForm />
           </div>
