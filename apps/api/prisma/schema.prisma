@@ -14,7 +14,8 @@ model User {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  notes   Note[]
+  notes     Note[]
+  tasks     Task[]
 
   @@map("users")
 }
@@ -38,4 +39,29 @@ model Tag{
   notes Note[]
 
   @@map("tags")
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  status      String   @default("pending")
+  priority    String   @default("medium") 
+  order       Float    @default(0)
+  dueDate     DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  parentId    String?
+  parent      Task?    @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]   @relation("TaskHierarchy")
+
+  @@map("tasks")
+  @@index([userId])
+  @@index([parentId])
 }
