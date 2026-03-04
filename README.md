@@ -6,7 +6,7 @@ Um “Segundo Cérebro” digital. Sistema integrado para gestão de conheciment
 
 ## Visão Geral
 
-O Architec não é apenas uma lista de tarefas. Ele é um ERP pessoal, projetado para resolver a fragmentação da vida digital.
+O Architec é um ERP pessoal, projetado para resolver a fragmentação da vida digital.
 
 Em vez de usar ferramentas separadas:
 
