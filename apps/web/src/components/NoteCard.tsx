@@ -25,6 +25,11 @@ export function NoteCard({ note, onDelete }: NoteCardProps) {
   // MUDANÇA 2: Função segura para pegar a data correta
   const displayDate = note.date || note.createdAt || new Date().toISOString();
 
+  // Preview seguro: strip HTML tags e trunca
+  const plainTextPreview = note.content
+    ? note.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 120)
+    : "Nota vazia";
+
   return (
     <div className="flex flex-col justify-between rounded-lg border border-slate-800 bg-slate-900/50 p-6 shadow-sm transition-all hover:border-slate-700 hover:shadow-md h-full">
       <div className="space-y-4">
@@ -42,10 +47,9 @@ export function NoteCard({ note, onDelete }: NoteCardProps) {
           </p>
         </div>
 
-        <div 
-          className="prose prose-invert prose-sm text-slate-400 line-clamp-6 [&>*:first-child]:mt-0"
-          dangerouslySetInnerHTML={{ __html: note.content }}
-        />
+        <p className="text-sm text-slate-400 line-clamp-4 leading-relaxed">
+          {plainTextPreview}{plainTextPreview.length >= 120 ? '...' : ''}
+        </p>
         
         {note.tags && note.tags.length > 0 && (
           <div className="flex gap-2 flex-wrap">
