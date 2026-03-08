@@ -9,12 +9,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  /* PAIRING DE FONTES */
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-heading: "Oswald", sans-serif;
 
   --radius-lg: 0.75rem;
-  
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -24,27 +23,92 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+
+  /* Deadlock palette tokens */
+  --color-arcane: var(--arcane);
+  --color-arcane-glow: var(--arcane-glow);
+  --color-relic: var(--relic);
+  --color-relic-dim: var(--relic-dim);
+  --color-toxic: var(--toxic);
+  --color-ember: var(--ember);
+  --color-ash: var(--ash);
 }
 
-:root {
-  /* PALETA LIMPA E PROFISSIONAL */
-  /* Background: Azul Noturno quase Preto (mais moderno) */
-  --background: #0a0a1a; 
-  /* Foreground: Gelo Puro #ECEFF1 */
-  --foreground: #eceff1; 
+/* ═══════════════════════════════════════════
+   DARK THEME — "The Deadlock Sanctum"
+   Inspired by: occult artifacts, aged brass,
+   toxic greens, smoldering embers
+   ═══════════════════════════════════════════ */
+:root, .dark {
+  --background: #0c0b0f;
+  --foreground: #e8e0d0;
 
-  /* Cards: Leve transparência para efeito de profundidade */
-  --card: #12122b;
-  --card-foreground: #eceff1;
+  --card: #141318;
+  --card-foreground: #e8e0d0;
 
-  /* Primário: Um azul vibrante porém sério para ações */
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
+  --primary: #c9a84c;
+  --primary-foreground: #0c0b0f;
 
-  /* Bordas: Tom sutil para não poluir a visão */
-  --border: #1e1e3f;
-  --input: #1e1e3f;
-  --ring: #3b82f6;
+  --muted: #1e1c24;
+  --muted-foreground: #8a8278;
+
+  --accent: #1f2a1f;
+  --accent-foreground: #a3d977;
+
+  --border: #2a2730;
+  --input: #1e1c24;
+  --ring: #c9a84c;
+
+  --destructive: #cc4444;
+
+  /* Signature colors */
+  --arcane: #c9a84c;
+  --arcane-glow: #e6c65a;
+  --relic: #8a7a52;
+  --relic-dim: #5c5238;
+  --toxic: #7bc96a;
+  --ember: #d4663a;
+  --ash: #3a3640;
+}
+
+/* ═══════════════════════════════════════════
+   LIGHT THEME — "The Parchment Workshop"
+   Aged parchment, brass fixtures, ink stains
+   ═══════════════════════════════════════════ */
+.light {
+  --background: #f0ebe0;
+  --foreground: #1c1814;
+
+  --card: #faf5eb;
+  --card-foreground: #1c1814;
+
+  --primary: #8b6914;
+  --primary-foreground: #faf5eb;
+
+  --muted: #e6dfd2;
+  --muted-foreground: #6b6258;
+
+  --accent: #dce8d2;
+  --accent-foreground: #2d5a1e;
+
+  --border: #c8c0b0;
+  --input: #e6dfd2;
+  --ring: #8b6914;
+
+  --destructive: #b33333;
+
+  --arcane: #8b6914;
+  --arcane-glow: #a67c1a;
+  --relic: #7a6c4e;
+  --relic-dim: #a89e88;
+  --toxic: #3d7a2e;
+  --ember: #b8502a;
+  --ash: #d4cdc0;
 }
 
 @layer base {
@@ -53,8 +117,8 @@
   }
   body {
     @apply font-sans bg-background text-foreground antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
-  /* Aplicação da Oswald apenas em Títulos */
   h1, h2, h3, h4, .font-heading {
     @apply font-heading uppercase tracking-wide;
   }

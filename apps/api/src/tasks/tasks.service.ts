@@ -39,6 +39,30 @@ export class TasksService {
   }
 
 
+
+  async createTask(
+    userId: string,
+    data: { title: string; parentId?: string | null },
+  ) {
+    const count = await this.prisma.task.count({ where: { userId } });
+    return this.prisma.task.create({
+      data: {
+        title: data.title,
+        userId,
+        parentId: data.parentId ?? null,
+        order: count,
+      },
+    });
+  }
+
+
+  async moveTask(taskId: string, userId: string, parentId: string | null) {
+    return this.prisma.task.update({
+      where: { id: taskId, userId },
+      data: { parentId },
+    });
+  }
+
   private buildTree(tasks: TaskWithChildren[]): TaskWithChildren[] {
     const map = new Map<string, TaskWithChildren>();
 
