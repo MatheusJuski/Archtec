@@ -1,15 +1,13 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { useAuthStore } from "@/store/auth";
-import { useThemeStore } from "@/store/theme";
 import {
   Task,
   TaskList,
   TaskCallbacks,
   flattenTaskIds,
 } from "@/components/TaskItem";
-import { Loader2, LogOut, Plus, Sun, Moon } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DndContext,
@@ -111,8 +109,6 @@ export function TasksPage() {
   const [creating, setCreating] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const signOut = useAuthStore((state) => state.signOut);
-  const { theme, toggleTheme } = useThemeStore();
 
   // Para DnD: precisamos de todos os IDs expandidos
   // por simplicidade, consideramos tudo expandido (o estado de expand está no TaskItem)
@@ -282,7 +278,7 @@ export function TasksPage() {
   })() : null;
 
   return (
-    <div className="mx-auto flex h-screen max-w-4xl flex-col gap-6 p-6">
+    <div className="mx-auto flex h-full max-w-4xl flex-col gap-6 p-6 overflow-hidden">
       {/* ═══ Header ═══ */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -290,24 +286,6 @@ export function TasksPage() {
           <h1 className="font-heading text-2xl font-bold tracking-wider text-foreground">
             Tarefas
           </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleTheme}
-            className="text-relic hover:text-arcane hover:bg-muted/50"
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={signOut}
-            className="text-relic hover:text-ember hover:bg-muted/50"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
         </div>
       </div>
 

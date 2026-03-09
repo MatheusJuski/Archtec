@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { useAuthStore } from "@/store/auth";
 import { Editor } from "@/components/Editor";
 import { useDebounce } from "@/hooks/use-debounce";
 import { CheckCircle2, Cloud, Loader2, Plus, Trash2, X } from "lucide-react";
@@ -18,7 +17,6 @@ export interface NoteData {
 
 export function NotesPage() {
   const [notes, setNotes] = useState<NoteData[]>([]);
-  const signOut = useAuthStore((state) => state.signOut);
   
   const navigate = useNavigate();
   const { id } = useParams();
@@ -178,10 +176,13 @@ export function NotesPage() {
     <div className="flex h-screen w-full bg-background overflow-hidden">
       
       {/* SIDEBAR */}
-      <aside className="w-80 flex flex-col border-r border-border bg-[#05050f] shrink-0">
-        <div className="p-4 border-b border-white/5 flex items-center justify-between">
-          <h2 className="font-heading text-lg font-bold text-foreground">Notas</h2>
-          <Button variant="ghost" size="icon" onClick={handleResetEditor} title="Nova Nota">
+      <aside className="w-72 flex flex-col border-r border-border bg-card/50 shrink-0">
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-0.5 rounded-full bg-linear-to-b from-arcane to-arcane/20" />
+            <h2 className="font-heading text-lg font-bold text-foreground">Notas</h2>
+          </div>
+          <Button variant="ghost" size="icon" onClick={handleResetEditor} title="Nova Nota" className="text-relic hover:text-arcane hover:bg-muted/50">
             <Plus size={18} />
           </Button>
         </div>
@@ -198,23 +199,23 @@ export function NotesPage() {
                     key={note.id}
                     onClick={() => handleSelectNote(note.id)}
                     className={`
-                      group flex flex-col gap-1 p-3 rounded-lg cursor-pointer transition-all border
-                      ${isActive ? "bg-white/10 border-white/10 shadow-sm" : "bg-transparent border-transparent hover:bg-white/5"}
+                      group flex flex-col gap-1 p-3 rounded-sm cursor-pointer transition-all border
+                      ${isActive ? "bg-arcane/10 border-arcane/20 shadow-[0_0_8px_rgba(201,168,76,0.08)]" : "bg-transparent border-transparent hover:bg-muted/40"}
                     `}
                   >
                     <div className="flex items-center justify-between">
-                      <h3 className={`font-sans font-medium text-sm truncate pr-2 ${isActive ? "text-foreground" : "text-slate-300"}`}>
+                      <h3 className={`font-sans font-medium text-sm truncate pr-2 ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
                         {note.title || "Sem título"}
                       </h3>
                       <button
                         onClick={(e) => handleDelete(note.id, e)}
-                        className="text-muted-foreground hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="text-muted-foreground hover:text-ember opacity-0 group-hover:opacity-100 transition-opacity"
                       >
                         <Trash2 size={14} />
                       </button>
                     </div>
                     
-                    <p className="text-xs text-muted-foreground truncate font-sans mb-1">
+                    <p className="text-xs text-relic truncate font-sans mb-1">
                       {note.content ? note.content.replace(/<[^>]+>/g, '').substring(0, 40) + "..." : "Nota vazia"}
                     </p>
 
@@ -222,7 +223,7 @@ export function NotesPage() {
                     {note.tags && note.tags.length > 0 && (
                        <div className="flex gap-1 overflow-hidden">
                          {note.tags.slice(0, 3).map((t, idx) => (
-                           <span key={idx} className="text-[10px] bg-white/5 text-muted-foreground px-1.5 py-0.5 rounded">
+                           <span key={idx} className="text-[10px] bg-arcane/10 text-relic px-1.5 py-0.5 rounded-sm">
                              #{typeof t === 'string' ? t : t.name}
                            </span>
                          ))}
@@ -235,15 +236,6 @@ export function NotesPage() {
             )}
           </div>
         </ScrollArea>
-        <div className="p-4 border-t border-white/5 mt-auto">
-          <Button 
-            variant="outline" 
-            onClick={signOut} 
-            className="w-full border-white/10 hover:bg-white/5 text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Sair
-          </Button>
-        </div>
       </aside>
 
       {/* ÁREA DO EDITOR */}
@@ -257,9 +249,9 @@ export function NotesPage() {
               </h1>
               
               <div className="flex items-center gap-2 text-sm font-sans font-medium">
-                {saveStatus === "idle" && <span className="flex items-center gap-1 text-muted-foreground"><Cloud size={16} /> Salvo localmente</span>}
-                {saveStatus === "saving" && <span className="flex items-center gap-1 text-blue-400"><Loader2 size={16} className="animate-spin" /> Salvando...</span>}
-                {saveStatus === "saved" && <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 size={16} /> Salvo na nuvem</span>}
+                {saveStatus === "idle" && <span className="flex items-center gap-1 text-relic"><Cloud size={16} /> Salvo localmente</span>}
+                {saveStatus === "saving" && <span className="flex items-center gap-1 text-arcane"><Loader2 size={16} className="animate-spin" /> Salvando...</span>}
+                {saveStatus === "saved" && <span className="flex items-center gap-1 text-toxic"><CheckCircle2 size={16} /> Salvo na nuvem</span>}
               </div>
             </div>
 
@@ -268,10 +260,10 @@ export function NotesPage() {
               {tags.map(tag => (
                 <span 
                   key={tag} 
-                  className="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-2.5 py-1 rounded-md text-xs font-sans font-medium"
+                  className="flex items-center gap-1.5 bg-arcane/10 border border-arcane/20 text-arcane px-2.5 py-1 rounded-sm text-xs font-sans font-medium"
                 >
                   #{tag}
-                  <button onClick={() => handleRemoveTag(tag)} className="hover:text-red-400 transition-colors">
+                  <button onClick={() => handleRemoveTag(tag)} className="hover:text-ember transition-colors">
                     <X size={12} />
                   </button>
                 </span>
@@ -283,7 +275,7 @@ export function NotesPage() {
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyDown={handleKeyDownTag}
                 placeholder={tags.length === 0 ? "Adicionar tag (Aperte Enter)..." : "Nova tag..."}
-                className="bg-transparent border-none text-sm text-slate-400 focus:outline-none focus:ring-0 flex-1 min-w-37.5 font-sans h-8"
+                className="bg-transparent border-none text-sm text-muted-foreground focus:outline-none focus:ring-0 flex-1 min-w-37.5 font-sans h-8"
               />
             </div>
           </header>

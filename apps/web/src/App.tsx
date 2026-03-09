@@ -3,6 +3,7 @@ import { LoginPage } from "./pages/Login";
 import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { AuthGuard } from "@/components/AuthGuard";
+import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect } from "react";
 import { useThemeStore } from "@/store/theme";
@@ -19,27 +20,27 @@ function App() {
     <BrowserRouter>
       <div className="bg-background min-h-screen text-foreground">
         <Routes>
-          
-          {/* 1. Rota Raiz: Redireciona direto para o painel principal */}
+          {/* 1. Rota Raiz */}
           <Route path="/" element={<Navigate to="/notes" replace />} />
 
           {/* 2. Rota Pública (Login) */}
           <Route element={<AuthGuard isPrivate={false} />}>
-            <Route path="/login" element={<LoginPage />} /> 
+            <Route path="/login" element={<LoginPage />} />
           </Route>
 
-          {/* 3. Rotas Privadas (Dashboard/Architec) */}
+          {/* 3. Rotas Privadas com Layout global */}
           <Route element={<AuthGuard isPrivate={true} />}>
-            <Route path="/notes" element={<NotesPage />} />
-            <Route path="/notes/:id" element={<NotesPage />} />
-            <Route path="/tasks" element={<TasksPage />} />
+            <Route element={<AppLayout />}>
+              <Route path="/notes" element={<NotesPage />} />
+              <Route path="/notes/:id" element={<NotesPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+            </Route>
           </Route>
 
-          {/* 4. Rota Coringa Segura: Manda para /notes em vez de /login */}
+          {/* 4. Rota Coringa Segura */}
           <Route path="*" element={<Navigate to="/notes" replace />} />
-          
         </Routes>
-        
+
         <Toaster position="top-right" richColors />
       </div>
     </BrowserRouter>
