@@ -20,11 +20,7 @@ export interface TaskWithChildren {
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  /**
-   * Retorna todas as tarefas do usuário.
-   * @param userId - ID do usuário autenticado
-   * @param tree 
-   */
+
   async findAll(userId: string, tree = false): Promise<TaskWithChildren[]> {
     const tasks = await this.prisma.task.findMany({
       where: { userId },
@@ -55,12 +51,91 @@ export class TasksService {
     });
   }
 
-
-  async moveTask(taskId: string, userId: string, parentId: string | null) {
-    return this.prisma.task.update({
+  async moveTask(
+    taskId: string,
+    userId: string,
+    parentId: string | null,
+    order?: number,
+  ) {
+    const task = await this.prisma.task.update({
       where: { id: taskId, userId },
       data: { parentId },
     });
+
+    if (order !== undefined) {
+      // Busca todos os irmãos no destino (mesmo parentId), ordenados
+      const siblings = await this.prisma.task.findMany({
+        where: { userId, parentId },
+        orderBy: { order: 'asc' },
+        select: { id: true },
+      });
+
+      // Recalcula a ordem: remove o item movido e reinsere na posição desejada
+      const ids = siblings.map((s) => s.id).filter((id) => id !== taskId);
+      const clampedOrder = Math.max(0, Math.min(order, ids.length));
+      ids.splice(clampedOrder, 0, taskId);
+
+      // Batch update de cada irmão com sua nova ordem
+      await this.prisma.$transaction(
+        ids.map((id, idx) =>
+          this.prisma.task.update({
+            where: { id },
+            data: { order: idx },
+          }),
+        ),
+      );
+    }
+
+    return task;
+  }
+
+  async completeTask(taskId: string, userId: string) {
+    const now = new Date();
+
+    // CTE recursiva: coleta taskId + todos os descendentes
+    await this.prisma.$executeRaw`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM tasks WHERE id = ${taskId} AND "userId" = ${userId}
+        UNION ALL
+        SELECT t.id FROM tasks t INNER JOIN descendants d ON t."parentId" = d.id
+      )
+      UPDATE tasks SET status = 'completed', "completedAt" = ${now}, "updatedAt" = ${now}
+      WHERE id IN (SELECT id FROM descendants)
+    `;
+
+    return this.findAll(userId, true);
+  }
+
+  async uncompleteTask(taskId: string, userId: string) {
+    const now = new Date();
+
+    await this.prisma.$executeRaw`
+      WITH RECURSIVE descendants AS (
+        SELECT id FROM tasks WHERE id = ${taskId} AND "userId" = ${userId}
+        UNION ALL
+        SELECT t.id FROM tasks t INNER JOIN descendants d ON t."parentId" = d.id
+      )
+      UPDATE tasks SET status = 'pending', "completedAt" = NULL, "updatedAt" = ${now}
+      WHERE id IN (SELECT id FROM descendants)
+    `;
+
+    return this.findAll(userId, true);
+  }
+
+  async toggleComplete(taskId: string, userId: string) {
+    const task = await this.prisma.task.findFirst({
+      where: { id: taskId, userId },
+      select: { status: true },
+    });
+
+    if (!task) {
+      throw new Error('Task not found');
+    }
+
+    if (task.status === 'completed') {
+      return this.uncompleteTask(taskId, userId);
+    }
+    return this.completeTask(taskId, userId);
   }
 
   private buildTree(tasks: TaskWithChildren[]): TaskWithChildren[] {

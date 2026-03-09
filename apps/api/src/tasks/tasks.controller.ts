@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, Request, UseGuards, NotFoundException } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
@@ -25,8 +25,17 @@ export class TasksController {
   move(
     @Request() req,
     @Param('id') id: string,
-    @Body('parentId') parentId: string | null,
+    @Body() body: { parentId: string | null; order?: number },
   ) {
-    return this.tasksService.moveTask(id, req.user.userId, parentId);
+    return this.tasksService.moveTask(id, req.user.userId, body.parentId, body.order);
+  }
+
+  @Patch(':id/toggle')
+  async toggleComplete(@Request() req, @Param('id') id: string) {
+    try {
+      return await this.tasksService.toggleComplete(id, req.user.userId);
+    } catch {
+      throw new NotFoundException('Tarefa não encontrada');
+    }
   }
 }

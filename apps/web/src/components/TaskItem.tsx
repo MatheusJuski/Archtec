@@ -8,8 +8,11 @@ import {
   Zap,
   CircleDot,
   CheckCircle2,
+  GripVertical,
 } from "lucide-react";
 import { useState } from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 export interface Task {
   id: string;
@@ -29,6 +32,7 @@ export interface Task {
 export interface TaskCallbacks {
   onIndent: (taskId: string) => void;
   onOutdent: (taskId: string) => void;
+  onToggleComplete: (taskId: string) => void;
 }
 
 interface TaskItemProps {
@@ -37,6 +41,32 @@ interface TaskItemProps {
   callbacks: TaskCallbacks;
   canIndent: boolean;
   canOutdent: boolean;
+}
+
+/** Achata a árvore em uma lista de IDs na ordem visível (preorder DFS) */
+export function flattenTaskIds(tasks: Task[], expanded: Set<string>): string[] {
+  const result: string[] = [];
+  for (const task of tasks) {
+    result.push(task.id);
+    if (task.children?.length && expanded.has(task.id)) {
+      result.push(...flattenTaskIds(task.children, expanded));
+    }
+  }
+  return result;
+}
+
+/** Retorna um map id → level para toda a árvore */
+export function buildLevelMap(tasks: Task[], level = 0): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const task of tasks) {
+    map.set(task.id, level);
+    if (task.children?.length) {
+      for (const [k, v] of buildLevelMap(task.children, level + 1)) {
+        map.set(k, v);
+      }
+    }
+  }
+  return map;
 }
 
 const priorityConfig: Record<string, { icon: typeof Flame; color: string; glow: string }> = {
@@ -75,10 +105,28 @@ export function TaskItem({
   const priority = priorityConfig[task.priority] ?? priorityConfig.medium;
   const PriorityIcon = priority.icon;
 
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    transition,
+  };
+
   return (
-    <div className="relative">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative ${isDragging ? "z-50 opacity-70" : ""}`}
+    >
       {/* Linha de conexão vertical para sub-tarefas */}
-      {level > 0 && (
+      {level > 0 && !isDragging && (
         <div
           className="absolute top-0 bottom-0 w-px bg-linear-to-b from-arcane/30 to-transparent"
           style={{ left: `${(level - 1) * 1.5 + 0.75}rem` }}
@@ -91,6 +139,7 @@ export function TaskItem({
           transition-all duration-200
           hover:bg-muted/60
           ${isCompleted ? "opacity-60" : ""}
+          ${isDragging ? "bg-card shadow-lg shadow-arcane/10 ring-1 ring-arcane/30" : ""}
         `}
         style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
         tabIndex={0}
@@ -105,6 +154,16 @@ export function TaskItem({
           }
         }}
       >
+        {/* Drag handle */}
+        <button
+          className="flex h-5 w-5 shrink-0 cursor-grab items-center justify-center text-relic/50 hover:text-arcane active:cursor-grabbing transition-colors"
+          {...attributes}
+          {...listeners}
+          aria-label="Arrastar para reordenar"
+        >
+          <GripVertical className="h-3.5 w-3.5" />
+        </button>
+
         {/* Chevron expandir/colapsar */}
         <button
           className="flex h-5 w-5 shrink-0 items-center justify-center text-relic hover:text-arcane transition-colors"
@@ -122,15 +181,22 @@ export function TaskItem({
           )}
         </button>
 
-        {/* Ícone de prioridade / status */}
-        {isCompleted ? (
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-toxic drop-shadow-[0_0_4px_rgba(123,201,106,0.5)]" />
-        ) : (
-          <PriorityIcon className={`h-4 w-4 shrink-0 ${priority.color} ${priority.glow}`} />
-        )}
+        {/* Ícone de prioridade / status — clicável para toggle complete */}
+        <button
+          className="shrink-0 transition-transform hover:scale-110"
+          onClick={() => callbacks.onToggleComplete(task.id)}
+          aria-label={isCompleted ? "Reabrir tarefa" : "Concluir tarefa"}
+          title={isCompleted ? "Reabrir" : "Concluir"}
+        >
+          {isCompleted ? (
+            <CheckCircle2 className="h-4 w-4 text-toxic drop-shadow-[0_0_4px_rgba(123,201,106,0.5)]" />
+          ) : (
+            <PriorityIcon className={`h-4 w-4 ${priority.color} ${priority.glow}`} />
+          )}
+        </button>
 
         {/* Linha decorativa horizontal */}
-        {level > 0 && (
+        {level > 0 && !isDragging && (
           <div className="absolute top-1/2 h-px w-3 bg-arcane/20"
             style={{ left: `${(level - 1) * 1.5 + 0.75}rem` }}
           />
@@ -147,14 +213,14 @@ export function TaskItem({
           {task.title}
         </span>
 
-        {/* Botões Indent / Outdent — sempre visíveis */}
+        {/* Botões Indent / Outdent */}
         {(canOutdent || canIndent) && (
           <div className="flex shrink-0 items-center gap-0.5 border border-border/50 rounded-sm overflow-hidden">
             {canOutdent && (
               <button
                 className="flex items-center gap-1 px-1.5 py-0.5 text-relic hover:text-arcane-glow hover:bg-ash/50 transition-colors text-[11px]"
                 onClick={() => callbacks.onOutdent(task.id)}
-                title="Promover (virar irmã do pai) — Shift+Tab"
+                title="Promover (Shift+Tab)"
                 aria-label="Promover tarefa"
               >
                 <ArrowLeft className="h-3 w-3" />
@@ -164,7 +230,7 @@ export function TaskItem({
               <button
                 className="flex items-center gap-1 px-1.5 py-0.5 text-relic hover:text-arcane-glow hover:bg-ash/50 transition-colors text-[11px]"
                 onClick={() => callbacks.onIndent(task.id)}
-                title="Rebaixar (virar filha da task acima) — Tab"
+                title="Rebaixar (Tab)"
                 aria-label="Rebaixar tarefa"
               >
                 <ArrowRight className="h-3 w-3" />
