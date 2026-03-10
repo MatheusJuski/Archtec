@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/Login";
 import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
+import { CalendarPage } from "@/pages/CalendarPage";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
@@ -34,6 +35,7 @@ function App() {
               <Route path="/notes" element={<NotesPage />} />
               <Route path="/notes/:id" element={<NotesPage />} />
               <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/calendar" element={<CalendarPage />} />
             </Route>
           </Route>
 
