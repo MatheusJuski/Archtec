@@ -29,7 +29,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
 
-  /* Deadlock palette tokens */
+
   --color-arcane: var(--arcane);
   --color-arcane-glow: var(--arcane-glow);
   --color-relic: var(--relic);
@@ -39,11 +39,6 @@
   --color-ash: var(--ash);
 }
 
-/* ═══════════════════════════════════════════
-   DARK THEME — "The Deadlock Sanctum"
-   Inspired by: occult artifacts, aged brass,
-   toxic greens, smoldering embers
-   ═══════════════════════════════════════════ */
 :root, .dark {
   --background: #0c0b0f;
   --foreground: #e8e0d0;
@@ -76,10 +71,7 @@
   --ash: #3a3640;
 }
 
-/* ═══════════════════════════════════════════
-   LIGHT THEME — "The Parchment Workshop"
-   Aged parchment, brass fixtures, ink stains
-   ═══════════════════════════════════════════ */
+
 .light {
   --background: #f0ebe0;
   --foreground: #1c1814;
@@ -308,76 +300,193 @@
 .arch-calendar .rbc-calendar {
   height: 100%;
   color: var(--foreground);
+  font-size: 0.92rem;
 }
 
-.arch-calendar .rbc-toolbar {
-  margin-bottom: 0.75rem;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+.arch-calendar .rbc-btn-group {
+  display: contents;
 }
 
-.arch-calendar .rbc-toolbar button {
-  background: var(--muted);
-  border: 1px solid var(--border);
+.arch-toolbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+}
+
+.arch-toolbar__label {
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: color-mix(in oklab, var(--foreground) 80%, var(--arcane-glow));
+}
+
+.arch-toolbar__nav,
+.arch-toolbar__views {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+  background: color-mix(in oklab, var(--muted) 50%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in oklab, white 7%, transparent);
+}
+
+.arch-toolbar button {
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--relic);
-  border-radius: 0.125rem;
-  padding: 0.35rem 0.6rem;
+  border-radius: 0.45rem;
+  padding: 0.35rem 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
-.arch-calendar .rbc-toolbar button:hover,
-.arch-calendar .rbc-toolbar button:focus,
-.arch-calendar .rbc-toolbar button.rbc-active {
-  background: color-mix(in oklab, var(--arcane) 18%, transparent);
+.arch-toolbar button:hover {
+  background: color-mix(in oklab, var(--arcane) 12%, transparent);
+  color: var(--foreground);
+}
+
+.arch-toolbar button.is-active,
+.arch-toolbar button:focus-visible {
   border-color: color-mix(in oklab, var(--arcane) 50%, var(--border));
+  background: color-mix(in oklab, var(--arcane) 22%, transparent);
   color: var(--arcane-glow);
+  outline: none;
 }
 
 .arch-calendar .rbc-month-view,
 .arch-calendar .rbc-time-view,
 .arch-calendar .rbc-agenda-view table {
-  border: 1px solid var(--border);
-  background: color-mix(in oklab, var(--card) 88%, transparent);
+  border: 1px solid color-mix(in oklab, var(--border) 35%, transparent);
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 130% at 0% 0%, color-mix(in oklab, var(--arcane) 9%, transparent), transparent 55%),
+    color-mix(in oklab, var(--card) 92%, transparent);
 }
 
-.arch-calendar .rbc-header,
-.arch-calendar .rbc-time-header-content,
+.arch-calendar .rbc-month-row + .rbc-month-row,
+.arch-calendar .rbc-day-bg + .rbc-day-bg,
+.arch-calendar .rbc-header + .rbc-header,
+.arch-calendar .rbc-time-content > * + * > *,
 .arch-calendar .rbc-timeslot-group,
-.arch-calendar .rbc-day-bg,
 .arch-calendar .rbc-time-content,
-.arch-calendar .rbc-month-row + .rbc-month-row {
-  border-color: var(--border);
+.arch-calendar .rbc-time-header-content {
+  border-color: color-mix(in oklab, var(--border) 18%, transparent) !important;
+}
+
+.arch-calendar .rbc-time-slot {
+  border-top: 1px solid color-mix(in oklab, var(--border) 8%, transparent) !important;
+}
+
+.arch-calendar .rbc-time-gutter .rbc-timeslot-group {
+  border-right-color: color-mix(in oklab, var(--border) 16%, transparent) !important;
+}
+
+.arch-calendar .rbc-time-content > .rbc-time-gutter,
+.arch-calendar .rbc-time-header-gutter,
+.arch-calendar .rbc-time-header,
+.arch-calendar .rbc-header,
+.arch-calendar .rbc-time-view,
+.arch-calendar .rbc-month-view,
+.arch-calendar .rbc-day-bg,
+.arch-calendar .rbc-time-content > * {
+  border-color: color-mix(in oklab, var(--border) 16%, transparent) !important;
+}
+
+.arch-calendar .rbc-timeslot-group:nth-child(odd) {
+  background: color-mix(in oklab, var(--muted) 10%, transparent);
+}
+
+.arch-calendar .rbc-timeslot-group:nth-child(even) {
+  background: transparent;
 }
 
 .arch-calendar .rbc-header {
-  padding: 0.4rem;
-  color: var(--relic);
+  padding: 0.5rem 0.35rem;
+  font-weight: 700;
+  color: color-mix(in oklab, var(--relic) 70%, var(--foreground));
+  text-transform: lowercase;
+  border-bottom-color: color-mix(in oklab, var(--border) 20%, transparent) !important;
 }
 
-.arch-calendar .rbc-off-range-bg {
-  background: color-mix(in oklab, var(--ash) 35%, transparent);
+/* Remove extra vertical gap created by the all-day lane in week/day views */
+.arch-calendar .rbc-allday-cell {
+  display: none;
+}
+
+.arch-calendar .rbc-time-header-content {
+  min-height: 0;
+}
+
+.arch-calendar .rbc-row-content {
+  min-height: 0;
+}
+
+.arch-calendar .rbc-label,
+.arch-calendar .rbc-time-gutter,
+.arch-calendar .rbc-time-header-gutter {
+  color: color-mix(in oklab, var(--relic) 75%, var(--foreground));
+}
+
+.arch-calendar .rbc-off-range-bg,
+.arch-calendar .rbc-off-range {
+  background: color-mix(in oklab, var(--ash) 22%, transparent);
+  color: color-mix(in oklab, var(--relic-dim) 70%, var(--foreground));
 }
 
 .arch-calendar .rbc-today {
-  background: color-mix(in oklab, var(--arcane) 10%, transparent);
+  background: color-mix(in oklab, var(--arcane) 11%, transparent);
 }
 
 .arch-calendar .rbc-current-time-indicator {
-  background-color: var(--ember);
+  background-color: color-mix(in oklab, var(--arcane-glow) 80%, var(--ember));
+  height: 2px;
 }
 
 .arch-calendar .rbc-event {
-  border: none;
-  border-radius: 0.125rem;
-  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-left-width: 3px;
+  border-radius: 0.5rem;
+  padding: 0.2rem 0.45rem;
   font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 4px 10px -8px rgba(0, 0, 0, 0.8);
+}
+
+.arch-calendar .rbc-event-content {
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .arch-calendar .rbc-event.arch-event-timeblock {
-  background: color-mix(in oklab, var(--toxic) 35%, var(--card));
-  color: var(--foreground);
+  background: color-mix(in oklab, var(--toxic) 24%, var(--card));
+  border-color: color-mix(in oklab, var(--toxic) 45%, var(--border));
+  color: color-mix(in oklab, var(--foreground) 90%, var(--toxic));
 }
 
 .arch-calendar .rbc-event.arch-event-generic {
-  background: color-mix(in oklab, var(--arcane) 30%, var(--card));
+  background: color-mix(in oklab, var(--arcane) 20%, var(--card));
+  border-color: color-mix(in oklab, var(--arcane) 40%, var(--border));
   color: var(--foreground);
+}
+
+@media (max-width: 900px) {
+  .arch-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .arch-toolbar__label {
+    order: -1;
+  }
+
+  .arch-toolbar__nav,
+  .arch-toolbar__views {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 }

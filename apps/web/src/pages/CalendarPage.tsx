@@ -7,6 +7,7 @@ import {
   Views,
   View,
   EventPropGetter,
+  ToolbarProps,
 } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -40,6 +41,49 @@ const localizer = dateFnsLocalizer({
   locales,
 });
 
+function capitalizeLabel(value: string) {
+  if (!value) return value;
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<CalendarEvent, object>) {
+  return (
+    <div className="arch-toolbar">
+      <div className="arch-toolbar__nav">
+        <button type="button" onClick={() => onNavigate("TODAY")}>Hoje</button>
+        <button type="button" onClick={() => onNavigate("PREV")}>Anterior</button>
+        <button type="button" onClick={() => onNavigate("NEXT")}>Próximo</button>
+      </div>
+
+      <div className="arch-toolbar__label">{capitalizeLabel(label)}</div>
+
+      <div className="arch-toolbar__views">
+        <button
+          type="button"
+          onClick={() => onView("month")}
+          className={view === Views.MONTH ? "is-active" : ""}
+        >
+          Mês
+        </button>
+        <button
+          type="button"
+          onClick={() => onView("week")}
+          className={view === Views.WEEK ? "is-active" : ""}
+        >
+          Semana
+        </button>
+        <button
+          type="button"
+          onClick={() => onView("day")}
+          className={view === Views.DAY ? "is-active" : ""}
+        >
+          Dia
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +96,7 @@ export function CalendarPage() {
       .then((res) => {
         const mapped = res.data.map((event) => ({
           id: event.id,
-          title: event.taskId ? `Timeblock: ${event.title}` : event.title,
+          title: event.title,
           start: new Date(event.startTime),
           end: new Date(event.endTime),
           isTimeBlock: Boolean(event.taskId),
@@ -94,11 +138,11 @@ export function CalendarPage() {
       <div className="flex items-center gap-3">
         <div className="h-8 w-1 rounded-full bg-linear-to-b from-arcane to-arcane/20" />
         <h1 className="font-heading text-2xl font-bold tracking-wider text-foreground">
-          Calendario
+          Calendário
         </h1>
       </div>
 
-      <div className="arch-calendar flex-1 overflow-hidden rounded-sm border border-border bg-card/50 p-3">
+      <div className="arch-calendar flex-1 overflow-hidden rounded-xl border border-border/60 bg-card/60 p-3 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.8)]">
         {loading ? (
           <div className="flex h-full items-center justify-center text-relic">Carregando eventos...</div>
         ) : (
@@ -113,8 +157,13 @@ export function CalendarPage() {
             startAccessor="start"
             endAccessor="end"
             views={[Views.MONTH, Views.WEEK, Views.DAY]}
+            step={60}
+            timeslots={1}
             messages={messages}
             popup
+            components={{
+              toolbar: CalendarToolbar,
+            }}
             eventPropGetter={eventStyleGetter}
           />
         )}
