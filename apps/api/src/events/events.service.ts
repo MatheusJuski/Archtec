@@ -1,6 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
+
+const EVENT_PAST_GRACE_DAYS = 1;
+const EVENT_FUTURE_LIMIT_YEARS = 10;
 
 @Injectable()
 export class EventsService {
@@ -10,12 +13,25 @@ export class EventsService {
     const start = new Date(dto.startTime);
     const end = new Date(dto.endTime);
 
+    const now = new Date();
+    const minAllowed = new Date(now);
+    minAllowed.setDate(minAllowed.getDate() - EVENT_PAST_GRACE_DAYS);
+
+    const maxAllowed = new Date(now);
+    maxAllowed.setFullYear(maxAllowed.getFullYear() + EVENT_FUTURE_LIMIT_YEARS);
+
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
       throw new BadRequestException('Data/hora inválida');
     }
 
     if (end <= start) {
       throw new BadRequestException('A hora de término deve ser posterior ao início');
+    }
+
+    if (start < minAllowed || start > maxAllowed || end < minAllowed || end > maxAllowed) {
+      throw new BadRequestException(
+        `Eventos só podem ficar entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`,
+      );
     }
 
     if (dto.taskId) {
@@ -68,5 +84,28 @@ export class EventsService {
         },
       },
     });
+  }
+
+  async remove(userId: string, eventId: string) {
+    const deleted = await this.prisma.event.deleteMany({
+      where: {
+        id: eventId,
+        userId,
+      },
+    });
+
+    if (deleted.count === 0) {
+      throw new NotFoundException('Evento não encontrado');
+    }
+
+    return { deleted: true };
+  }
+
+  async removeAll(userId: string) {
+    const deleted = await this.prisma.event.deleteMany({
+      where: { userId },
+    });
+
+    return { deletedCount: deleted.count };
   }
 }
