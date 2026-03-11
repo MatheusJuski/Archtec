@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Calendar as BigCalendar,
   dateFnsLocalizer,
@@ -8,9 +11,28 @@ import {
   View,
   EventPropGetter,
   ToolbarProps,
+  SlotInfo,
 } from "react-big-calendar";
 import { format, parse, startOfWeek, getDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 interface EventFromApi {
@@ -29,6 +51,23 @@ interface CalendarEvent {
   isTimeBlock: boolean;
 }
 
+const createEventSchema = z
+  .object({
+    title: z.string().trim().min(1, "Título é obrigatório"),
+    startTime: z.string().min(1, "Início é obrigatório"),
+    endTime: z.string().min(1, "Término é obrigatório"),
+  })
+  .refine((data) => {
+    const start = new Date(data.startTime);
+    const end = new Date(data.endTime);
+    return !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && end > start;
+  }, {
+    message: "A hora de término deve ser posterior ao início",
+    path: ["endTime"],
+  });
+
+type CreateEventValues = z.infer<typeof createEventSchema>;
+
 const locales = {
   "pt-BR": ptBR,
 };
@@ -44,6 +83,11 @@ const localizer = dateFnsLocalizer({
 function capitalizeLabel(value: string) {
   if (!value) return value;
   return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function toDateTimeLocal(date: Date) {
+  const tzOffset = date.getTimezoneOffset() * 60000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
 }
 
 function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<CalendarEvent, object>) {
@@ -87,25 +131,75 @@ function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<Calen
 export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
 
+  const form = useForm<CreateEventValues>({
+    resolver: zodResolver(createEventSchema),
+    defaultValues: {
+      title: "",
+      startTime: "",
+      endTime: "",
+    },
+  });
+
+  const fetchEvents = useCallback(async () => {
+    const res = await api.get<EventFromApi[]>("/events");
+    const mapped = res.data.map((event) => ({
+      id: event.id,
+      title: event.title,
+      start: new Date(event.startTime),
+      end: new Date(event.endTime),
+      isTimeBlock: Boolean(event.taskId),
+    }));
+    setEvents(mapped);
+  }, []);
+
   useEffect(() => {
-    api
-      .get<EventFromApi[]>("/events")
-      .then((res) => {
-        const mapped = res.data.map((event) => ({
-          id: event.id,
-          title: event.title,
-          start: new Date(event.startTime),
-          end: new Date(event.endTime),
-          isTimeBlock: Boolean(event.taskId),
-        }));
-        setEvents(mapped);
-      })
+    fetchEvents()
       .catch(() => toast.error("Erro ao carregar eventos"))
       .finally(() => setLoading(false));
-  }, []);
+  }, [fetchEvents]);
+
+  function handleSelectSlot(slotInfo: SlotInfo) {
+    const start = slotInfo.start instanceof Date ? slotInfo.start : new Date(slotInfo.start);
+    const end = slotInfo.end instanceof Date ? slotInfo.end : new Date(slotInfo.end);
+
+    let normalizedEnd = end;
+    if (view === Views.MONTH) {
+      normalizedEnd = new Date(start.getTime() + 60 * 60 * 1000);
+    }
+
+    form.reset({
+      title: "",
+      startTime: toDateTimeLocal(start),
+      endTime: toDateTimeLocal(normalizedEnd),
+    });
+    setIsCreateDialogOpen(true);
+  }
+
+  async function onCreateEvent(values: CreateEventValues) {
+    setIsSaving(true);
+    try {
+      await api.post("/events", {
+        title: values.title,
+        startTime: new Date(values.startTime).toISOString(),
+        endTime: new Date(values.endTime).toISOString(),
+      });
+
+      await fetchEvents();
+      setIsCreateDialogOpen(false);
+      form.reset();
+      toast.success("Evento criado com sucesso");
+    } catch (error: any) {
+      const message = error?.response?.data?.message;
+      toast.error(Array.isArray(message) ? message[0] : message || "Erro ao criar evento");
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   const messages = useMemo(
     () => ({
@@ -146,26 +240,102 @@ export function CalendarPage() {
         {loading ? (
           <div className="flex h-full items-center justify-center text-relic">Carregando eventos...</div>
         ) : (
-          <BigCalendar
-            localizer={localizer}
-            culture="pt-BR"
-            events={events}
-            view={view}
-            date={date}
-            onView={setView}
-            onNavigate={setDate}
-            startAccessor="start"
-            endAccessor="end"
-            views={[Views.MONTH, Views.WEEK, Views.DAY]}
-            step={60}
-            timeslots={1}
-            messages={messages}
-            popup
-            components={{
-              toolbar: CalendarToolbar,
-            }}
-            eventPropGetter={eventStyleGetter}
-          />
+          <>
+            <BigCalendar
+              localizer={localizer}
+              culture="pt-BR"
+              events={events}
+              view={view}
+              date={date}
+              onView={setView}
+              onNavigate={setDate}
+              startAccessor="start"
+              endAccessor="end"
+              views={[Views.MONTH, Views.WEEK, Views.DAY]}
+              step={60}
+              timeslots={1}
+              messages={messages}
+              popup
+              selectable
+              onSelectSlot={handleSelectSlot}
+              components={{
+                toolbar: CalendarToolbar,
+              }}
+              eventPropGetter={eventStyleGetter}
+            />
+
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogContent className="border-border bg-card/95 text-foreground backdrop-blur">
+                <DialogHeader>
+                  <DialogTitle className="font-heading tracking-wide">Novo Evento</DialogTitle>
+                  <DialogDescription>
+                    Preencha os dados para criar um evento no calendário.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onCreateEvent)} className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name="title"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Título</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Ex: Revisão semanal" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <FormField
+                        control={form.control}
+                        name="startTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Início</FormLabel>
+                            <FormControl>
+                              <Input type="datetime-local" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="endTime"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Término</FormLabel>
+                            <FormControl>
+                              <Input type="datetime-local" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsCreateDialogOpen(false)}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button type="submit" disabled={isSaving}>
+                        {isSaving ? "Salvando..." : "Salvar evento"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </div>
     </div>
