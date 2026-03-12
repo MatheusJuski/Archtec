@@ -181,6 +181,13 @@ function dateToFormParts(date: Date) {
   };
 }
 
+function extractApiErrorMessage(error: any, fallback: string) {
+  const message = error?.response?.data?.message;
+  if (Array.isArray(message)) return message[0] ?? fallback;
+  if (typeof message === "string" && message.trim().length > 0) return message;
+  return fallback;
+}
+
 function flattenTasks(tasks: TaskFromApi[], level = 0): FlatTask[] {
   return tasks.flatMap((task) => [
     { id: task.id, title: task.title, level },
@@ -476,8 +483,8 @@ export function CalendarPage() {
     try {
       await createEventFromTaskDrop(draggedTask, start);
       toast.success(`Timeblock criado para: ${draggedTask.title}`);
-    } catch {
-      toast.error("Erro ao criar timeblock da tarefa");
+    } catch (error: any) {
+      toast.error(extractApiErrorMessage(error, "Erro ao criar timeblock da tarefa"));
     } finally {
       setIsSaving(false);
     }
@@ -533,8 +540,7 @@ export function CalendarPage() {
       form.reset();
       toast.success("Evento criado com sucesso");
     } catch (error: any) {
-      const message = error?.response?.data?.message;
-      toast.error(Array.isArray(message) ? message[0] : message || "Erro ao criar evento");
+      toast.error(extractApiErrorMessage(error, "Erro ao criar evento"));
     } finally {
       setIsSaving(false);
     }

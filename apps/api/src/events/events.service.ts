@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateEventDto } from './dto/create-event.dto';
 
@@ -31,6 +36,26 @@ export class EventsService {
     if (start < minAllowed || start > maxAllowed || end < minAllowed || end > maxAllowed) {
       throw new BadRequestException(
         `Eventos só podem ficar entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`,
+      );
+    }
+
+    const overlappingEvent = await this.prisma.event.findFirst({
+      where: {
+        userId,
+        startTime: { lt: end },
+        endTime: { gt: start },
+      },
+      select: {
+        id: true,
+        title: true,
+        startTime: true,
+        endTime: true,
+      },
+    });
+
+    if (overlappingEvent) {
+      throw new ConflictException(
+        `Conflito de horário com "${overlappingEvent.title}" (${overlappingEvent.startTime.toISOString()} - ${overlappingEvent.endTime.toISOString()})`,
       );
     }
 
