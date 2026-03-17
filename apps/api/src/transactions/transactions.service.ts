@@ -6,6 +6,13 @@ import { CreateTransactionDto } from './dto/create-transaction.dto';
 export class TransactionsService {
   constructor(private prisma: PrismaService) {}
 
+  findAll(userId: string) {
+    return this.prisma.transaction.findMany({
+      where: { userId },
+      orderBy: { occurredAt: 'desc' },
+    });
+  }
+
   create(userId: string, dto: CreateTransactionDto) {
     return this.prisma.transaction.create({
       data: {

@@ -3,6 +3,7 @@ import { LoginPage } from "./pages/Login";
 import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { CalendarPage } from "@/pages/CalendarPage";
+import { FinancePage } from "@/pages/FinancePage";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
@@ -36,6 +37,7 @@ function App() {
               <Route path="/notes/:id" element={<NotesPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/finance" element={<FinancePage />} />
             </Route>
           </Route>
 

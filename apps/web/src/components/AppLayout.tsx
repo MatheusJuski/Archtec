@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from "react-router-dom";
-import { FileText, ListChecks, CalendarDays, Sun, Moon, LogOut } from "lucide-react";
+import { FileText, ListChecks, CalendarDays, Sun, Moon, LogOut, Landmark } from "lucide-react";
 import { useThemeStore } from "@/store/theme";
 import { useAuthStore } from "@/store/auth";
 import logo from "@/assets/favicon.svg";
@@ -8,6 +8,7 @@ const navItems = [
   { to: "/notes", icon: FileText, label: "Notas" },
   { to: "/tasks", icon: ListChecks, label: "Tarefas" },
   { to: "/calendar", icon: CalendarDays, label: "Calendario" },
+  { to: "/finance", icon: Landmark, label: "Financas" },
 ];
 
 export function AppLayout() {
