@@ -2,7 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   Query,
   Request,
@@ -54,5 +56,10 @@ export class TransactionsController {
   @Post()
   create(@Request() req, @Body() dto: CreateTransactionDto) {
     return this.transactionsService.create(req.user.userId, dto);
+  }
+
+  @Delete(':id')
+  remove(@Request() req, @Param('id') id: string) {
+    return this.transactionsService.remove(req.user.userId, id);
   }
 }

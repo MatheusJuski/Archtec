@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 
@@ -58,5 +58,20 @@ export class TransactionsService {
         occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
       },
     });
+  }
+
+  async remove(userId: string, transactionId: string) {
+    const deleted = await this.prisma.transaction.deleteMany({
+      where: {
+        id: transactionId,
+        userId,
+      },
+    });
+
+    if (deleted.count === 0) {
+      throw new NotFoundException('Transação não encontrada');
+    }
+
+    return { deleted: true };
   }
 }
