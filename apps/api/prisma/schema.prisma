@@ -27,6 +27,10 @@ enum TransactionType {
   EXPENSE
 }
 
+enum RecurrenceFrequency {
+  MONTHLY
+}
+
 model Note {
   id       String   @id @default(uuid())
   title   String
@@ -100,6 +104,8 @@ model Transaction {
   type        TransactionType
   category    String
   description String?
+  isRecurring Boolean         @default(false)
+  recurrenceFrequency RecurrenceFrequency?
   occurredAt  DateTime        @default(now())
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt

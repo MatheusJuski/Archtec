@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -6,11 +7,16 @@ import {
   IsString,
   Min,
   MinLength,
+  ValidateIf,
 } from 'class-validator';
 
 export enum CreateTransactionType {
   INCOME = 'INCOME',
   EXPENSE = 'EXPENSE',
+}
+
+export enum CreateTransactionRecurrenceFrequency {
+  MONTHLY = 'MONTHLY',
 }
 
 export class CreateTransactionDto {
@@ -32,4 +38,14 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsDateString({}, { message: 'occurredAt deve ser uma data válida' })
   occurredAt?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'isRecurring deve ser booleano' })
+  isRecurring?: boolean;
+
+  @ValidateIf((o: CreateTransactionDto) => o.isRecurring === true)
+  @IsEnum(CreateTransactionRecurrenceFrequency, {
+    message: 'recurrenceFrequency deve ser MONTHLY quando recorrente',
+  })
+  recurrenceFrequency?: CreateTransactionRecurrenceFrequency;
 }
