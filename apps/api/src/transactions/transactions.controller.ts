@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Patch,
   Param,
   Post,
   Query,
@@ -19,12 +20,7 @@ import { TransactionsService } from './transactions.service';
 export class TransactionsController {
   constructor(private readonly transactionsService: TransactionsService) {}
 
-  @Get('summary')
-  summary(
-    @Request() req,
-    @Query('month') month?: string,
-    @Query('year') year?: string,
-  ) {
+  private parseMonthYear(month?: string, year?: string) {
     const parsedMonthValue = month ? Number(month) : null;
     const parsedYearValue = year ? Number(year) : null;
 
@@ -42,10 +38,32 @@ export class TransactionsController {
       throw new BadRequestException('year deve ser um inteiro válido');
     }
 
-    const parsedMonth = parsedMonthValue ?? undefined;
-    const parsedYear = parsedYearValue ?? undefined;
+    return {
+      month: parsedMonthValue ?? undefined,
+      year: parsedYearValue ?? undefined,
+    };
+  }
+
+  @Get('summary')
+  summary(
+    @Request() req,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const { month: parsedMonth, year: parsedYear } = this.parseMonthYear(month, year);
 
     return this.transactionsService.summary(req.user.userId, parsedMonth, parsedYear);
+  }
+
+  @Get('expenses-by-category')
+  expensesByCategory(
+    @Request() req,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const { month: parsedMonth, year: parsedYear } = this.parseMonthYear(month, year);
+
+    return this.transactionsService.expensesByCategory(req.user.userId, parsedMonth, parsedYear);
   }
 
   @Get()
@@ -56,6 +74,11 @@ export class TransactionsController {
   @Post()
   create(@Request() req, @Body() dto: CreateTransactionDto) {
     return this.transactionsService.create(req.user.userId, dto);
+  }
+
+  @Patch(':id')
+  update(@Request() req, @Param('id') id: string, @Body() dto: CreateTransactionDto) {
+    return this.transactionsService.update(req.user.userId, id, dto);
   }
 
   @Delete(':id')

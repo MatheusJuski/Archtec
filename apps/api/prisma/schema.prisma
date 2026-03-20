@@ -18,6 +18,7 @@ model User {
   tasks     Task[]
   events    Event[]
   transactions Transaction[]
+  categories Category[]
 
   @@map("users")
 }
@@ -103,6 +104,7 @@ model Transaction {
   amount      Float
   type        TransactionType
   category    String
+  categoryColor String?
   description String?
   isRecurring Boolean         @default(false)
   recurrenceFrequency RecurrenceFrequency?
@@ -112,9 +114,28 @@ model Transaction {
 
   userId      String
   user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  categoryId  String?
+  categoryRef Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
   @@map("transactions")
   @@index([userId])
+  @@index([categoryId])
   @@index([type])
   @@index([occurredAt])
+}
+
+model Category {
+  id           String        @id @default(uuid())
+  name         String
+  color        String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@map("categories")
+  @@index([userId])
+  @@unique([userId, name])
 }

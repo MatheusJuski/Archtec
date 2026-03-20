@@ -2,6 +2,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsHexColor,
   IsNumber,
   IsOptional,
   IsString,
@@ -34,6 +35,10 @@ export class CreateTransactionDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsHexColor({ message: 'categoryColor deve ser uma cor hexadecimal válida (#RRGGBB)' })
+  categoryColor?: string;
 
   @IsOptional()
   @IsDateString({}, { message: 'occurredAt deve ser uma data válida' })
