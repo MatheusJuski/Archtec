@@ -9,6 +9,7 @@ import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
 import Typography from '@tiptap/extension-typography'
 import { SlashCommand } from './extensions/SlashCommand'
+import { NoteMention } from './extensions/NoteMention'
 import {
   Heading1, Heading2, List, Bold, Italic, Strikethrough, Code,
   Underline as UnderlineIcon, Highlighter, Link as LinkIcon
@@ -27,6 +28,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
     extensions: [
       StarterKit,
       SlashCommand,
+      NoteMention,
       Underline,
       Highlight.configure({ multicolor: false }),
       Typography,
@@ -37,7 +39,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
         HTMLAttributes: { class: 'editor-link' },
       }),
       Placeholder.configure({
-        placeholder: 'Digite "/" para comandos...',
+        placeholder: 'Digite "/" para comandos ou "@" para referenciar nota...',
         includeChildren: true,
         showOnlyWhenEditable: true,
       }),

@@ -2,6 +2,7 @@ import { Outlet, NavLink } from "react-router-dom";
 import { FileText, ListChecks, CalendarDays, Sun, Moon, LogOut, Landmark } from "lucide-react";
 import { useThemeStore } from "@/store/theme";
 import { useAuthStore } from "@/store/auth";
+import { SearchAllCommand } from "@/components/SearchAllCommand";
 import logo from "@/assets/favicon.svg";
 
 const navItems = [
@@ -46,6 +47,7 @@ export function AppLayout() {
 
         {/* Bottom actions */}
         <div className="flex flex-col items-center gap-1">
+          <SearchAllCommand />
           <button
             onClick={toggleTheme}
             className="flex h-10 w-10 items-center justify-center rounded-sm text-relic hover:text-arcane hover:bg-muted/50 transition-colors"

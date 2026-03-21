@@ -6,6 +6,7 @@ import { TasksModule } from './tasks/tasks.module';
 import { EventsModule } from './events/events.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { SearchModule } from './search/search.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     TasksModule,
     EventsModule,
     TransactionsModule,
+    SearchModule,
   ],
   controllers: [],
   providers: [],
