@@ -41,6 +41,7 @@ model Note {
   userId   String
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   tags     Tag[]
+  events   Event[]
 
   @@map("notes")
 }
@@ -82,6 +83,7 @@ model Task {
 model Event {
   id        String   @id @default(uuid())
   title     String
+  description String?
   startTime DateTime
   endTime   DateTime
   createdAt DateTime @default(now())
@@ -93,9 +95,13 @@ model Event {
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
 
+  noteId    String?
+  note      Note?    @relation(fields: [noteId], references: [id], onDelete: SetNull)
+
   @@map("events")
   @@index([userId])
   @@index([taskId])
+  @@index([noteId])
   @@index([startTime])
 }
 

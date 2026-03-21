@@ -25,21 +25,25 @@ export function NotesPage() {
   const [loadedNoteId, setLoadedNoteId] = useState<string | null>(null);
 
   // Estados do Editor
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState(""); 
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
+  const debouncedTitle = useDebounce(title, 1000);
   const debouncedContent = useDebounce(content, 1000);
   const debouncedTags = useDebounce(tags, 1000);
 
   // 1. REFS: Para acessar os dados mais recentes sem engatilhar re-renderizações infinitas
+  const titleRef = useRef(title);
   const contentRef = useRef(content);
   const tagsRef = useRef(tags);
   useEffect(() => {
+    titleRef.current = title;
     contentRef.current = content;
     tagsRef.current = tags;
-  }, [content, tags]);
+  }, [title, content, tags]);
 
   // 2. CARREGAMENTO INICIAL
   useEffect(() => {
@@ -61,15 +65,29 @@ export function NotesPage() {
       if (loadedNoteId !== null) {
          const oldNote = notes.find(n => n.id === loadedNoteId);
          if (oldNote) {
+          const latestTitle = titleRef.current;
             const latestContent = contentRef.current;
             const latestTags = tagsRef.current;
             const oldTags = oldNote.tags?.map(t => typeof t === 'string' ? t : t.name) || [];
 
             // Se algo foi alterado, despacha pro banco em background
-            if (oldNote.content !== latestContent || JSON.stringify(oldTags) !== JSON.stringify(latestTags)) {
-               api.patch(`/notes/${loadedNoteId}`, { content: latestContent, tags: latestTags }).catch(() => {});
+          if (
+            oldNote.title !== latestTitle ||
+            oldNote.content !== latestContent ||
+            JSON.stringify(oldTags) !== JSON.stringify(latestTags)
+          ) {
+            api.patch(`/notes/${loadedNoteId}`, {
+             title: latestTitle.trim() || "Nova Nota",
+             content: latestContent,
+             tags: latestTags,
+            }).catch(() => {});
                // Mantém a lista atualizada
-               setNotes(prev => prev.map(n => n.id === loadedNoteId ? { ...n, content: latestContent, tags: latestTags } : n));
+            setNotes(prev => prev.map(n => n.id === loadedNoteId ? {
+             ...n,
+             title: latestTitle.trim() || "Nova Nota",
+             content: latestContent,
+             tags: latestTags,
+            } : n));
             }
          }
       }
@@ -78,11 +96,13 @@ export function NotesPage() {
       if (activeNoteId && notes.length > 0) {
          const selectedNote = notes.find((n) => n.id === activeNoteId);
          if (selectedNote) {
+          setTitle(selectedNote.title || "");
             setContent(selectedNote.content || "");
             setTags(selectedNote.tags?.map(t => typeof t === 'string' ? t : t.name) || []);
             setLoadedNoteId(activeNoteId);
          }
       } else if (!activeNoteId) {
+        setTitle("");
          setContent("");
          setTags([]);
          setLoadedNoteId(null);
@@ -112,23 +132,29 @@ export function NotesPage() {
     if (loadedNoteId !== activeNoteId) return;
     
 
-    if (content !== debouncedContent || tags !== debouncedTags) return;
+    if (title !== debouncedTitle || content !== debouncedContent || tags !== debouncedTags) return;
 
-    if (!activeNoteId && (!debouncedContent || debouncedContent === "<p></p>") && debouncedTags.length === 0) return;
+    if (
+      !activeNoteId &&
+      (!debouncedTitle.trim()) &&
+      (!debouncedContent || debouncedContent === "<p></p>") &&
+      debouncedTags.length === 0
+    ) return;
 
     if (activeNote) {
+      const titleUnchanged = debouncedTitle === (activeNote.title || "");
       const contentUnchanged = debouncedContent === (activeNote.content || "");
       const loadedTags = activeNote.tags ? activeNote.tags.map(t => typeof t === 'string' ? t : t.name) : [];
       const tagsUnchanged = debouncedTags.length === loadedTags.length && debouncedTags.every((val, index) => val === loadedTags[index]);
       
-      if (contentUnchanged && tagsUnchanged) return;
+      if (titleUnchanged && contentUnchanged && tagsUnchanged) return;
     }
 
     async function autoSaveNote() {
       setSaveStatus("saving");
 
       const payload = {
-        title: "Nova Nota",
+        title: debouncedTitle.trim() || "Nova Nota",
         content: debouncedContent,
         tags: debouncedTags,
       };
@@ -141,7 +167,7 @@ export function NotesPage() {
         } else {
           await api.patch(`/notes/${activeNoteId}`, payload);
           setNotes(prev => prev.map(note => 
-            note.id === activeNoteId ? { ...note, content: payload.content, tags: payload.tags } : note
+            note.id === activeNoteId ? { ...note, title: payload.title, content: payload.content, tags: payload.tags } : note
           ));
         }
 
@@ -154,7 +180,7 @@ export function NotesPage() {
     }
 
     autoSaveNote();
-  }, [debouncedContent, debouncedTags, activeNoteId, activeNote, loadedNoteId, content, tags, navigate]); 
+  }, [debouncedTitle, debouncedContent, debouncedTags, activeNoteId, activeNote, loadedNoteId, title, content, tags, navigate]); 
 
   // 6. NAVEGAÇÃO E EXCLUSÃO
   const handleResetEditor = useCallback(() => navigate("/notes"), [navigate]);
@@ -205,7 +231,7 @@ export function NotesPage() {
                   >
                     <div className="flex items-center justify-between">
                       <h3 className={`font-sans font-medium text-sm truncate pr-2 ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
-                        {note.title || "Sem título"}
+                        {note.title?.trim() || "Sem título"}
                       </h3>
                       <button
                         onClick={(e) => handleDelete(note.id, e)}
@@ -244,9 +270,17 @@ export function NotesPage() {
           
           <header className="flex flex-col gap-4 border-b border-border pb-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-heading text-foreground">
-                {activeNoteId ? "Editando Nota" : "Criar Nova Nota"}
-              </h1>
+              <div className="min-w-0 flex-1 pr-4">
+                <p className="mb-1 text-xs font-heading tracking-wider text-relic">
+                  {activeNoteId ? "Editando nota" : "Criar nova nota"}
+                </p>
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Título da nota"
+                  className="w-full rounded-sm border border-border/60 bg-transparent px-3 py-2 text-xl font-heading text-foreground outline-none transition-colors focus:border-arcane/50"
+                />
+              </div>
               
               <div className="flex items-center gap-2 text-sm font-sans font-medium">
                 {saveStatus === "idle" && <span className="flex items-center gap-1 text-relic"><Cloud size={16} /> Salvo localmente</span>}

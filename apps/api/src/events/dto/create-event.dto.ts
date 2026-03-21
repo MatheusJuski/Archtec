@@ -5,6 +5,10 @@ export class CreateEventDto {
   @IsNotEmpty()
   title: string;
 
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsDateString()
   startTime: string;
 
@@ -14,4 +18,8 @@ export class CreateEventDto {
   @IsOptional()
   @IsUUID()
   taskId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  noteId?: string;
 }

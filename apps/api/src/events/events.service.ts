@@ -73,13 +73,29 @@ export class EventsService {
       }
     }
 
+    if (dto.noteId) {
+      const note = await this.prisma.note.findFirst({
+        where: {
+          id: dto.noteId,
+          userId,
+        },
+        select: { id: true },
+      });
+
+      if (!note) {
+        throw new BadRequestException('Nota inválida para vincular ao evento');
+      }
+    }
+
     return this.prisma.event.create({
       data: {
         title: dto.title.trim(),
+        description: dto.description?.trim() || null,
         startTime: start,
         endTime: end,
         userId,
         taskId: dto.taskId ?? null,
+        noteId: dto.noteId ?? null,
       },
       include: {
         task: {
@@ -88,6 +104,12 @@ export class EventsService {
             title: true,
             status: true,
             priority: true,
+          },
+        },
+        note: {
+          select: {
+            id: true,
+            title: true,
           },
         },
       },
@@ -105,6 +127,12 @@ export class EventsService {
             title: true,
             status: true,
             priority: true,
+          },
+        },
+        note: {
+          select: {
+            id: true,
+            title: true,
           },
         },
       },

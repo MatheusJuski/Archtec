@@ -59,17 +59,26 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 interface EventFromApi {
   id: string;
   title: string;
+  description: string | null;
   startTime: string;
   endTime: string;
   taskId: string | null;
+  noteId: string | null;
 }
 
 interface CalendarEvent {
   id: string;
   title: string;
+  description: string | null;
   start: Date;
   end: Date;
   isTimeBlock: boolean;
+  noteId: string | null;
+}
+
+interface NoteFromApi {
+  id: string;
+  title: string;
 }
 
 interface TaskFromApi {
@@ -102,6 +111,8 @@ function getEventWindow() {
 const createEventSchema = z
   .object({
     title: z.string().trim().min(1, "Título é obrigatório"),
+    description: z.string().optional(),
+    noteId: z.string().optional(),
     startDate: z.string().min(1, "Data inicial é obrigatória"),
     startTime: z.string().min(1, "Hora inicial é obrigatória"),
     endDate: z.string().min(1, "Data final é obrigatória"),
@@ -265,6 +276,7 @@ function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<Calen
 export function CalendarPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tasks, setTasks] = useState<FlatTask[]>([]);
+  const [notes, setNotes] = useState<NoteFromApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -286,6 +298,8 @@ export function CalendarPage() {
     resolver: zodResolver(createEventSchema),
     defaultValues: {
       title: "",
+      description: "",
+      noteId: "",
       startDate: "",
       startTime: "09:00",
       endDate: "",
@@ -306,9 +320,11 @@ export function CalendarPage() {
     const mapped = res.data.map((event) => ({
       id: event.id,
       title: event.title,
+      description: event.description,
       start: new Date(event.startTime),
       end: new Date(event.endTime),
       isTimeBlock: Boolean(event.taskId),
+      noteId: event.noteId,
     }));
     setEvents(mapped);
   }, []);
@@ -324,6 +340,13 @@ export function CalendarPage() {
       .get<TaskFromApi[]>("/tasks", { params: { tree: "true" } })
       .then((res) => setTasks(flattenTasks(res.data)))
       .catch(() => toast.error("Erro ao carregar tarefas"));
+  }, []);
+
+  useEffect(() => {
+    api
+      .get<NoteFromApi[]>("/notes")
+      .then((res) => setNotes(res.data))
+      .catch(() => toast.error("Erro ao carregar notas"));
   }, []);
 
   function calculateDropDate(viewMode: View, baseDate: Date, x: number, y: number) {
@@ -504,6 +527,8 @@ export function CalendarPage() {
 
     form.reset({
       title: "",
+      description: "",
+      noteId: "",
       startDate: startParts.date,
       startTime: startParts.time,
       endDate: endParts.date,
@@ -531,6 +556,8 @@ export function CalendarPage() {
 
       await api.post("/events", {
         title: values.title,
+        description: values.description?.trim() || undefined,
+        noteId: values.noteId?.trim() || undefined,
         startTime: start.toISOString(),
         endTime: end.toISOString(),
       });
@@ -710,6 +737,45 @@ export function CalendarPage() {
                               <FormLabel>Título</FormLabel>
                               <FormControl>
                                 <Input placeholder="Ex: Revisão semanal" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="description"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Descrição</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Detalhes do evento" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="noteId"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Referenciar nota</FormLabel>
+                              <FormControl>
+                                <select
+                                  className="arch-picker h-10 w-full"
+                                  value={field.value || ""}
+                                  onChange={(event) => field.onChange(event.target.value)}
+                                >
+                                  <option value="">Sem nota vinculada</option>
+                                  {notes.map((note) => (
+                                    <option key={note.id} value={note.id}>
+                                      {note.title?.trim() || "Sem título"}
+                                    </option>
+                                  ))}
+                                </select>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
