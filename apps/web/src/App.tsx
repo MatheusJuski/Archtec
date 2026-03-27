@@ -4,6 +4,7 @@ import { NotesPage } from "@/pages/NotesPage";
 import { TasksPage } from "@/pages/TasksPage";
 import { CalendarPage } from "@/pages/CalendarPage";
 import { FinancePage } from "@/pages/FinancePage";
+import { DashboardPage } from "@/pages/DashboardPage";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
@@ -33,6 +34,7 @@ function App() {
           {/* 3. Rotas Privadas com Layout global */}
           <Route element={<AuthGuard isPrivate={true} />}>
             <Route element={<AppLayout />}>
+              <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/notes" element={<NotesPage />} />
               <Route path="/notes/:id" element={<NotesPage />} />
               <Route path="/tasks" element={<TasksPage />} />

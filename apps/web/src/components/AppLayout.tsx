@@ -6,6 +6,7 @@ import { SearchAllCommand } from "@/components/SearchAllCommand";
 import logo from "@/assets/favicon.svg";
 
 const navItems = [
+  { to: "/dashboard", icon: Sun, label: "Hoje" },
   { to: "/notes", icon: FileText, label: "Notas" },
   { to: "/tasks", icon: ListChecks, label: "Tarefas" },
   { to: "/calendar", icon: CalendarDays, label: "Calendario" },
