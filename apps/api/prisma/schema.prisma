@@ -44,6 +44,9 @@ model Note {
   events   Event[]
 
   @@map("notes")
+  @@index([userId])
+  @@index([userId, title])
+  @@index([userId, content])
 }
 
 model Tag{
@@ -77,6 +80,7 @@ model Task {
 
   @@map("tasks")
   @@index([userId])
+  @@index([userId, title])
   @@index([parentId])
 }
 
@@ -100,6 +104,7 @@ model Event {
 
   @@map("events")
   @@index([userId])
+  @@index([userId, title])
   @@index([taskId])
   @@index([noteId])
   @@index([startTime])

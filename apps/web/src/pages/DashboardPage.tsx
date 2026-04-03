@@ -14,19 +14,46 @@ interface Task {
   dueDate: string | null;
 }
 
+interface TransactionsSummary {
+  month: number;
+  year: number;
+  income: number;
+  expense: number;
+  balance: number;
+}
+
+const currencyFormatter = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+});
+
+const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+});
+
 export function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [summary, setSummary] = useState<TransactionsSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       api.get("/events"),
       api.get("/tasks"),
+      api.get<TransactionsSummary>("/transactions/summary"),
     ])
-      .then(([eventsRes, tasksRes]) => {
+      .then(([eventsRes, tasksRes, summaryRes]) => {
         setEvents(eventsRes.data);
         setTasks(tasksRes.data);
+        setSummary({
+          month: summaryRes.data.month,
+          year: summaryRes.data.year,
+          income: Number(summaryRes.data.income),
+          expense: Number(summaryRes.data.expense),
+          balance: Number(summaryRes.data.balance),
+        });
       })
       .finally(() => setLoading(false));
   }, []);
@@ -60,11 +87,54 @@ export function DashboardPage() {
     [tasks, today]
   );
 
+  const financialSummary = summary ?? {
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+    income: 0,
+    expense: 0,
+    balance: 0,
+  };
+
+  const monthLabel = monthFormatter.format(
+    new Date(financialSummary.year, financialSummary.month - 1, 1)
+  );
+  const isPositiveBalance = financialSummary.balance >= 0;
+
   if (loading) return <div className="p-8 text-center">Carregando...</div>;
 
   return (
-    <div className="flex justify-center mt-8">
-      <TodayWidget events={todayEvents} tasks={todayTasks} />
+    <div className="mx-auto mt-8 grid w-full max-w-5xl gap-6 px-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <section className="rounded-xl border border-border/60 bg-card/80 p-6 shadow-[0_20px_45px_-35px_rgba(0,0,0,0.8)]">
+        <p className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          Saldo Atual
+        </p>
+        <h1 className={`mt-2 text-4xl font-semibold ${isPositiveBalance ? "text-toxic" : "text-ember"}`}>
+          {currencyFormatter.format(financialSummary.balance)}
+        </h1>
+        <p className="mt-2 text-sm text-muted-foreground">A saúde financeira em um relance.</p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Receitas</p>
+            <p className="mt-2 text-xl font-semibold text-toxic">
+              {currencyFormatter.format(financialSummary.income)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Despesas</p>
+            <p className="mt-2 text-xl font-semibold text-ember">
+              {currencyFormatter.format(financialSummary.expense)}
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-4 text-xs text-muted-foreground">Período: {monthLabel}</p>
+      </section>
+
+      <div className="lg:justify-self-end lg:w-full">
+        <TodayWidget events={todayEvents} tasks={todayTasks} />
+      </div>
     </div>
   );
 }
