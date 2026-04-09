@@ -98,6 +98,62 @@ Checklist final:
 - CORS sem erro entre frontend e backend.
 - Nenhum segredo em arquivos versionados.
 
+## Etapa 6 - Auditoria de seguranca e qualidade pos-deploy
+
+Rode esta rotina a cada deploy em producao.
+
+### 6.1 Dependencias com vulnerabilidades
+
+Backend (runtime):
+
+npm --prefix apps/api audit --omit=dev
+
+Frontend (runtime):
+
+npm --prefix apps/web audit --omit=dev
+
+Objetivo:
+- Corrigir primeiro severidades high e critical.
+- Evitar npm audit fix --force sem validar breaking changes.
+
+### 6.2 Segredos hardcoded
+
+Verifique se arquivos sensiveis nao foram versionados:
+
+git ls-files apps/api/.env
+git ls-files apps/web/.env
+
+Se qualquer comando retornar arquivo, remova do versionamento imediatamente.
+
+### 6.3 CORS e autenticacao
+
+1. Abra o frontend em producao.
+2. Faça login por email e por Google.
+3. Abra o DevTools Network e confirme:
+- Nao ha erro CORS.
+- Requisicoes para a API retornam 2xx/401 esperado.
+
+### 6.4 Prisma e banco
+
+No backend em producao:
+
+npx prisma migrate deploy
+
+Depois valide criacao e leitura de dados reais no app.
+
+### 6.5 Headers e HTTPS
+
+Confirme:
+- Frontend e backend com HTTPS.
+- Cookies e tokens trafegam apenas em HTTPS em producao.
+- Se usar proxy/CDN, habilite HSTS e X-Content-Type-Options.
+
+### 6.6 Rotina de monitoramento
+
+- Crie alerta para erro 5xx no provedor (Render/Railway/Vercel).
+- Crie alerta para picos de latencia no backend.
+- Revise logs de autenticacao (falhas repetidas de login).
+
 ## Seguranca e boas praticas
 
 - Nunca comitar .env de producao.
