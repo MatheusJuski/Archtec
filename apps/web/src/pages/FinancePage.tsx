@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/table"
 
 type TransactionType = "INCOME" | "EXPENSE"
+type RecurrenceFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"
 
 const createTransactionSchema = z.object({
   type: z.enum(["INCOME", "EXPENSE"], {
@@ -59,7 +60,7 @@ const createTransactionSchema = z.object({
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Cor inválida"),
   isRecurring: z.boolean(),
-  recurrenceFrequency: z.enum(["MONTHLY"]).optional(),
+  recurrenceFrequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
 }).superRefine((value, ctx) => {
   if (value.isRecurring && !value.recurrenceFrequency) {
     ctx.addIssue({
@@ -80,7 +81,7 @@ interface Transaction {
   categoryColor?: string | null
   description: string | null
   isRecurring?: boolean
-  recurrenceFrequency?: "MONTHLY" | null
+  recurrenceFrequency?: RecurrenceFrequency | null
   occurredAt: string
   createdAt: string
   updatedAt: string
@@ -134,7 +135,7 @@ export function FinancePage() {
       occurredAt: new Date().toISOString().slice(0, 10),
       categoryColor: "#f97316",
       isRecurring: false,
-      recurrenceFrequency: undefined,
+      recurrenceFrequency: "DAILY",
     },
   })
 
@@ -169,7 +170,7 @@ export function FinancePage() {
       occurredAt: new Date().toISOString().slice(0, 10),
       categoryColor: "#f97316",
       isRecurring: false,
-      recurrenceFrequency: undefined,
+      recurrenceFrequency: "DAILY",
     })
   }
 
@@ -190,7 +191,7 @@ export function FinancePage() {
       categoryColor: transaction.categoryColor || "#f97316",
       isRecurring: Boolean(transaction.isRecurring),
       recurrenceFrequency: transaction.isRecurring
-        ? transaction.recurrenceFrequency || "MONTHLY"
+        ? transaction.recurrenceFrequency || "DAILY"
         : undefined,
     })
     setIsCreateOpen(true)
@@ -207,7 +208,7 @@ export function FinancePage() {
         amount: Number(values.amount.replace(",", ".")),
         occurredAt: new Date(`${values.occurredAt}T12:00:00`).toISOString(),
         isRecurring: values.isRecurring,
-        recurrenceFrequency: values.isRecurring ? values.recurrenceFrequency ?? "MONTHLY" : undefined,
+        recurrenceFrequency: values.isRecurring ? values.recurrenceFrequency ?? "DAILY" : undefined,
       }
 
       if (transactionToEdit) {
@@ -614,7 +615,18 @@ export function FinancePage() {
                           <input
                             type="checkbox"
                             checked={field.value}
-                            onChange={(event) => field.onChange(event.target.checked)}
+                            onChange={(event) => {
+                              const checked = event.target.checked
+                              field.onChange(checked)
+
+                              if (checked) {
+                                form.setValue("recurrenceFrequency", "DAILY", {
+                                  shouldDirty: true,
+                                  shouldValidate: true,
+                                })
+                                form.clearErrors("recurrenceFrequency")
+                              }
+                            }}
                           />
                           Repetir todos os meses
                         </label>
@@ -634,10 +646,13 @@ export function FinancePage() {
                         <FormControl>
                           <select
                             className="arch-picker h-10 w-full"
-                            value={field.value || "MONTHLY"}
+                            value={field.value || "DAILY"}
                             onChange={(event) => field.onChange(event.target.value)}
                           >
+                            <option value="DAILY">Diária</option>
+                            <option value="WEEKLY">Semanal</option>
                             <option value="MONTHLY">Mensal</option>
+                            <option value="YEARLY">Anual</option>
                           </select>
                         </FormControl>
                         <FormMessage />

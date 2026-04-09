@@ -17,7 +17,10 @@ export enum CreateTransactionType {
 }
 
 export enum CreateTransactionRecurrenceFrequency {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
   MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
 }
 
 export class CreateTransactionDto {
@@ -50,7 +53,7 @@ export class CreateTransactionDto {
 
   @ValidateIf((o: CreateTransactionDto) => o.isRecurring === true)
   @IsEnum(CreateTransactionRecurrenceFrequency, {
-    message: 'recurrenceFrequency deve ser MONTHLY quando recorrente',
+    message: 'recurrenceFrequency deve ser DAILY, WEEKLY, MONTHLY ou YEARLY quando recorrente',
   })
   recurrenceFrequency?: CreateTransactionRecurrenceFrequency;
 }

@@ -29,7 +29,10 @@ enum TransactionType {
 }
 
 enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
   MONTHLY
+  YEARLY
 }
 
 model Note {

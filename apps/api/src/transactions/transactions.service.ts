@@ -37,15 +37,40 @@ export class TransactionsService {
     );
   }
 
+  private addRecurrenceDate(source: Date, recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY') {
+    switch (recurrenceFrequency) {
+      case 'DAILY': {
+        const next = new Date(source);
+        next.setDate(next.getDate() + 1);
+        return next;
+      }
+      case 'WEEKLY': {
+        const next = new Date(source);
+        next.setDate(next.getDate() + 7);
+        return next;
+      }
+      case 'YEARLY':
+        return this.normalizeMonthlyDate(source, 12);
+      case 'MONTHLY':
+      default:
+        return this.normalizeMonthlyDate(source, 1);
+    }
+  }
+
   @Cron('0 0 * * *')
-  async processMonthlyRecurringTransactions() {
+  async processRecurringTransactions() {
     const now = new Date();
-    const todayDay = now.getDate();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
 
     const recurring = await this.prisma.transaction.findMany({
       where: {
         isRecurring: true,
-        recurrenceFrequency: 'MONTHLY',
+        recurrenceFrequency: {
+          in: ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'],
+        },
         occurredAt: {
           lte: now,
         },
@@ -62,11 +87,12 @@ export class TransactionsService {
     let createdCount = 0;
 
     for (const tx of recurring) {
-      if (tx.occurredAt.getDate() !== todayDay) {
+      const recurrenceFrequency = tx.recurrenceFrequency ?? 'MONTHLY';
+      const nextDate = this.addRecurrenceDate(tx.occurredAt, recurrenceFrequency);
+      if (nextDate < todayStart || nextDate > todayEnd) {
         continue;
       }
 
-      const nextDate = this.normalizeMonthlyDate(tx.occurredAt, 1);
       const nextStart = new Date(nextDate);
       nextStart.setHours(0, 0, 0, 0);
       const nextEnd = new Date(nextDate);
@@ -80,7 +106,7 @@ export class TransactionsService {
           amount: tx.amount,
           description: tx.description,
           isRecurring: true,
-          recurrenceFrequency: 'MONTHLY',
+          recurrenceFrequency,
           occurredAt: {
             gte: nextStart,
             lte: nextEnd,
@@ -99,10 +125,11 @@ export class TransactionsService {
           amount: tx.amount,
           type: tx.type,
           category: tx.category,
+          categoryColor: tx.categoryColor,
           description: tx.description,
           occurredAt: nextDate,
           isRecurring: true,
-          recurrenceFrequency: 'MONTHLY',
+          recurrenceFrequency,
         },
       });
 
@@ -110,7 +137,7 @@ export class TransactionsService {
     }
 
     if (createdCount > 0) {
-      this.logger.log(`Recurring monthly transactions generated: ${createdCount}`);
+      this.logger.log(`Recurring transactions generated: ${createdCount}`);
     }
   }
 
