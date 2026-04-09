@@ -2,6 +2,7 @@ import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common'
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('users')
@@ -16,6 +17,11 @@ export class UsersController {
   @Post('login')
   login(@Body() loginDto: LoginDto) {
     return this.usersService.login(loginDto);
+  }
+
+  @Post('google')
+  googleAuth(@Body() dto: GoogleAuthDto) {
+    return this.usersService.googleAuth(dto);
   }
 
   // Rota Protegida: Só acessa quem tem o Token

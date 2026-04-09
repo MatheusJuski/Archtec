@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useState } from "react"
+import { GoogleLogin } from "@react-oauth/google"
 import { Button } from "@/components/ui/button"
 import {
   Form,
@@ -27,6 +28,8 @@ type AuthValues = z.infer<typeof authSchema>
 
 export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false)
+  const googleEnabled = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID)
   
   // 2. Estado para controlar qual tela estamos exibindo
   const [isRegistering, setIsRegistering] = useState(false) 
@@ -97,6 +100,20 @@ export function LoginForm() {
     form.clearErrors()
   }
 
+  async function handleGoogleLogin(idToken: string) {
+    setIsGoogleLoading(true)
+    try {
+      const response = await api.post("/users/google", { idToken })
+      signIn(response.data.access_token)
+      toast.success("Login com Google realizado com sucesso!")
+    } catch (error) {
+      console.error(error)
+      toast.error("Não foi possível entrar com Google.")
+    } finally {
+      setIsGoogleLoading(false)
+    }
+  }
+
   return (
     <div className="grid gap-6">
         
@@ -163,6 +180,42 @@ export function LoginForm() {
             </Button>
           </form>
         </Form>
+
+        {googleEnabled && (
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">ou</span>
+            </div>
+          </div>
+        )}
+
+        {googleEnabled && (
+          <div className="w-full flex justify-center">
+            <GoogleLogin
+              onSuccess={(credentialResponse) => {
+                if (!credentialResponse.credential) {
+                  toast.error("Google não retornou um token válido.")
+                  return
+                }
+                void handleGoogleLogin(credentialResponse.credential)
+              }}
+              onError={() => {
+                toast.error("Falha na autenticação com Google.")
+              }}
+              useOneTap={false}
+              text={isRegistering ? "signup_with" : "signin_with"}
+              shape="pill"
+              width="320"
+            />
+          </div>
+        )}
+
+        {googleEnabled && isGoogleLoading && (
+          <p className="text-center text-xs text-muted-foreground">Validando login do Google...</p>
+        )}
 
         {/* Botão para alternar entre Login e Cadastro */}
         <div className="text-center text-sm text-slate-400">

@@ -11,8 +11,13 @@ async function bootstrap() {
     forbidNonWhitelisted: true, 
   }));
 
-  app.enableCors();
-  await app.listen(3333);
-  console.log('Backend rodando em http://localhost:3333');
+  const corsOrigin = process.env.CORS_ORIGIN;
+
+  app.enableCors({
+    origin: corsOrigin ? corsOrigin.split(',').map((origin) => origin.trim()) : true,
+  });
+  const port = Number(process.env.PORT ?? 3333);
+  await app.listen(port);
+  console.log(`Backend rodando na porta ${port}`);
 }
 bootstrap();

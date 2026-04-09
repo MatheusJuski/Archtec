@@ -68,6 +68,77 @@ O backend é responsável por proteger a lógica do sistema, evitando que regras
 - Prisma ORM — Acesso type-safe ao banco  
 - Docker — Containerização do ambiente  
 
+---
+
+## Docker Mais Leve
+
+Para reduzir consumo de recursos no dia a dia:
+
+- O banco usa volume nomeado (evita crescer a pasta versionada).
+- O pgAdmin roda só quando necessário via profile.
+- Logs dos containers foram limitados.
+
+Subir apenas banco:
+
+```bash
+docker compose up -d
+```
+
+Subir banco + pgAdmin:
+
+```bash
+docker compose --profile tools up -d
+```
+
+---
+
+## Criação/Login com Google (Backend)
+
+Endpoint novo na API:
+
+- `POST /users/google`
+
+Payload:
+
+```json
+{
+	"idToken": "TOKEN_ID_GOOGLE"
+}
+```
+
+Variável obrigatória na API:
+
+- `GOOGLE_CLIENT_ID`
+
+Comportamento:
+
+- Se o e-mail já existir, faz login e retorna JWT.
+- Se não existir, cria conta automaticamente e retorna JWT.
+
+### Configuração Necessária (Frontend + Backend)
+
+1. Crie os arquivos de ambiente a partir dos exemplos:
+
+```bash
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+2. No Google Cloud Console:
+
+- Crie um projeto e configure a tela de consentimento OAuth.
+- Crie um OAuth Client ID do tipo **Web application**.
+- Em "Authorized JavaScript origins", adicione:
+	- `http://localhost:5173`
+	- (produção) URL real do frontend.
+
+3. Copie o mesmo Client ID para:
+
+- `apps/api/.env` em `GOOGLE_CLIENT_ID`
+- `apps/web/.env` em `VITE_GOOGLE_CLIENT_ID`
+
+4. Suba backend e frontend. O botão Google aparece automaticamente na tela de login quando `VITE_GOOGLE_CLIENT_ID` estiver definido.
+
 ### Frontend
 - React (Vite) — UI moderna e performática  
 - TypeScript — Tipagem estática e segurança  
@@ -124,3 +195,11 @@ Este repositório faz parte do meu portfólio como engenheiro de software. Grand
 
 **Autor:** Matheus Juski  
 Projeto de portfólio focado em Engenharia de Software.
+
+---
+
+## Deploy em Nuvem (MVP)
+
+Guia completo da task de provisionamento e deploy:
+
+- [DEPLOYMENT.md](DEPLOYMENT.md)

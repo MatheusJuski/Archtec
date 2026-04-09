@@ -4,7 +4,7 @@
   "description": "Architect (Life OS)\r Um \"Segundo Cérebro\" digital. Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm --prefix apps/api run test"
   },
   "repository": {
     "type": "git",
