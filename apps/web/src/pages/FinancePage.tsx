@@ -628,7 +628,7 @@ export function FinancePage() {
                               }
                             }}
                           />
-                          Repetir todos os meses
+                          Frequência
                         </label>
                       </FormControl>
                       <FormMessage />
