@@ -9,6 +9,7 @@ import {
 } from "@/components/TaskItem";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DndContext,
   closestCenter,
@@ -106,6 +107,9 @@ export function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTitle, setNewTitle] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newRecurring, setNewRecurring] = useState(false);
+  const [newRecurrenceFrequency, setNewRecurrenceFrequency] = useState<"DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY">("WEEKLY");
   const [creating, setCreating] = useState(false);
   const [activeId, setActiveId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,10 +157,18 @@ export function TasksPage() {
     if (!title) return;
     setCreating(true);
     try {
-      const res = await api.post("/tasks", { title });
+      const payload = {
+        title,
+        dueDate: newDueDate ? new Date(`${newDueDate}T12:00:00`).toISOString() : undefined,
+        isRecurring: newRecurring,
+        recurrenceFrequency: newRecurring ? newRecurrenceFrequency : undefined,
+      };
+      const res = await api.post("/tasks", payload);
       const created: Task = { ...res.data, children: [] };
       setTasks((prev) => [...prev, created]);
       setNewTitle("");
+      setNewDueDate("");
+      setNewRecurring(false);
       inputRef.current?.focus();
     } catch {
       toast.error("Erro ao criar tarefa");
@@ -324,6 +336,36 @@ export function TasksPage() {
             <Plus className="h-4 w-4" />
           )}
         </Button>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Input
+          type="date"
+          value={newDueDate}
+          onChange={(e) => setNewDueDate(e.target.value)}
+          className="h-9"
+        />
+
+        <label className="flex h-9 items-center gap-2 rounded-sm border border-border bg-card px-3 text-sm text-foreground">
+          <input
+            type="checkbox"
+            checked={newRecurring}
+            onChange={(e) => setNewRecurring(e.target.checked)}
+          />
+          Recorrente
+        </label>
+
+        <select
+          className="arch-picker h-9"
+          value={newRecurrenceFrequency}
+          onChange={(e) => setNewRecurrenceFrequency(e.target.value as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY")}
+          disabled={!newRecurring}
+        >
+          <option value="DAILY">Diária</option>
+          <option value="WEEKLY">Semanal</option>
+          <option value="MONTHLY">Mensal</option>
+          <option value="YEARLY">Anual</option>
+        </select>
       </div>
 
       {/* ═══ Separador ornamental ═══ */}

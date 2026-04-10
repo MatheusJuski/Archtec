@@ -117,6 +117,8 @@ const createEventSchema = z
     startTime: z.string().min(1, "Hora inicial é obrigatória"),
     endDate: z.string().min(1, "Data final é obrigatória"),
     endTime: z.string().min(1, "Hora final é obrigatória"),
+    isRecurring: z.boolean().optional(),
+    recurrenceFrequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
   })
   .refine((data) => {
     const start = buildDateFromInputs(data.startDate, data.startTime);
@@ -137,6 +139,13 @@ const createEventSchema = z
   }, {
     message: `Eventos só podem ficar entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`,
     path: ["startDate"],
+  })
+  .refine((data) => {
+    if (!data.isRecurring) return true;
+    return Boolean(data.recurrenceFrequency);
+  }, {
+    message: "Selecione a frequência da recorrência",
+    path: ["recurrenceFrequency"],
   });
 
 type CreateEventValues = z.infer<typeof createEventSchema>;
@@ -304,6 +313,8 @@ export function CalendarPage() {
       startTime: "09:00",
       endDate: "",
       endTime: "10:00",
+      isRecurring: false,
+      recurrenceFrequency: "WEEKLY",
     },
   });
 
@@ -533,6 +544,8 @@ export function CalendarPage() {
       startTime: startParts.time,
       endDate: endParts.date,
       endTime: endParts.time,
+      isRecurring: false,
+      recurrenceFrequency: "WEEKLY",
     });
     setIsCreateDialogOpen(true);
   }
@@ -560,6 +573,8 @@ export function CalendarPage() {
         noteId: values.noteId?.trim() || undefined,
         startTime: start.toISOString(),
         endTime: end.toISOString(),
+        isRecurring: Boolean(values.isRecurring),
+        recurrenceFrequency: values.isRecurring ? values.recurrenceFrequency : undefined,
       });
 
       await fetchEvents();
@@ -828,6 +843,56 @@ export function CalendarPage() {
                               </FormItem>
                             )}
                           />
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <FormField
+                            control={form.control}
+                            name="isRecurring"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Recorrência</FormLabel>
+                                <FormControl>
+                                  <label className="flex h-10 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm">
+                                    <input
+                                      type="checkbox"
+                                      checked={Boolean(field.value)}
+                                      onChange={(event) => field.onChange(event.target.checked)}
+                                    />
+                                    Repetir automaticamente
+                                  </label>
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          {form.watch("isRecurring") ? (
+                            <FormField
+                              control={form.control}
+                              name="recurrenceFrequency"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Frequência</FormLabel>
+                                  <FormControl>
+                                    <select
+                                      className="arch-picker h-10 w-full"
+                                      value={field.value || "WEEKLY"}
+                                      onChange={(event) => field.onChange(event.target.value)}
+                                    >
+                                      <option value="DAILY">Diária</option>
+                                      <option value="WEEKLY">Semanal</option>
+                                      <option value="MONTHLY">Mensal</option>
+                                      <option value="YEARLY">Anual</option>
+                                    </select>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          ) : (
+                            <div />
+                          )}
                         </div>
 
                         <p className="text-xs text-relic">

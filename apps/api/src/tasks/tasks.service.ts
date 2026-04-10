@@ -9,6 +9,8 @@ export interface TaskWithChildren {
   priority: string;
   order: number;
   dueDate: Date | null;
+  isRecurring: boolean;
+  recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
   completedAt: Date | null;
   parentId: string | null;
   createdAt: Date;
@@ -19,6 +21,26 @@ export interface TaskWithChildren {
 @Injectable()
 export class TasksService {
   constructor(private prisma: PrismaService) {}
+
+  private addRecurrenceDate(source: Date, recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY') {
+    const next = new Date(source);
+    switch (recurrenceFrequency) {
+      case 'DAILY':
+        next.setDate(next.getDate() + 1);
+        break;
+      case 'WEEKLY':
+        next.setDate(next.getDate() + 7);
+        break;
+      case 'YEARLY':
+        next.setFullYear(next.getFullYear() + 1);
+        break;
+      case 'MONTHLY':
+      default:
+        next.setMonth(next.getMonth() + 1);
+        break;
+    }
+    return next;
+  }
 
 
   async findAll(userId: string, tree = false): Promise<TaskWithChildren[]> {
@@ -38,7 +60,13 @@ export class TasksService {
 
   async createTask(
     userId: string,
-    data: { title: string; parentId?: string | null },
+    data: {
+      title: string;
+      parentId?: string | null;
+      dueDate?: string | null;
+      isRecurring?: boolean;
+      recurrenceFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
+    },
   ) {
     const count = await this.prisma.task.count({ where: { userId } });
     return this.prisma.task.create({
@@ -46,6 +74,9 @@ export class TasksService {
         title: data.title,
         userId,
         parentId: data.parentId ?? null,
+        dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        isRecurring: data.isRecurring ?? false,
+        recurrenceFrequency: data.isRecurring ? (data.recurrenceFrequency ?? 'MONTHLY') : null,
         order: count,
       },
     });
@@ -92,6 +123,24 @@ export class TasksService {
   async completeTask(taskId: string, userId: string) {
     const now = new Date();
 
+    const currentTask = await this.prisma.task.findFirst({
+      where: { id: taskId, userId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        priority: true,
+        parentId: true,
+        dueDate: true,
+        isRecurring: true,
+        recurrenceFrequency: true,
+      },
+    });
+
+    if (!currentTask) {
+      throw new Error('Task not found');
+    }
+
     // CTE recursiva: coleta taskId + todos os descendentes
     await this.prisma.$executeRaw`
       WITH RECURSIVE descendants AS (
@@ -102,6 +151,43 @@ export class TasksService {
       UPDATE tasks SET status = 'completed', "completedAt" = ${now}, "updatedAt" = ${now}
       WHERE id IN (SELECT id FROM descendants)
     `;
+
+    if (currentTask.isRecurring && currentTask.dueDate && currentTask.recurrenceFrequency) {
+      const nextDueDate = this.addRecurrenceDate(currentTask.dueDate, currentTask.recurrenceFrequency);
+
+      const alreadyExists = await this.prisma.task.findFirst({
+        where: {
+          userId,
+          title: currentTask.title,
+          parentId: currentTask.parentId,
+          isRecurring: true,
+          recurrenceFrequency: currentTask.recurrenceFrequency,
+          dueDate: {
+            gte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate(), 0, 0, 0, 0),
+            lt: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate() + 1, 0, 0, 0, 0),
+          },
+        },
+        select: { id: true },
+      });
+
+      if (!alreadyExists) {
+        const count = await this.prisma.task.count({ where: { userId } });
+        await this.prisma.task.create({
+          data: {
+            userId,
+            title: currentTask.title,
+            description: currentTask.description,
+            priority: currentTask.priority,
+            status: 'pending',
+            parentId: currentTask.parentId,
+            dueDate: nextDueDate,
+            isRecurring: true,
+            recurrenceFrequency: currentTask.recurrenceFrequency,
+            order: count,
+          },
+        });
+      }
+    }
 
     return this.findAll(userId, true);
   }

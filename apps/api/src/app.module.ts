@@ -8,6 +8,7 @@ import { TransactionsModule } from './transactions/transactions.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SearchModule } from './search/search.module';
 import { HealthController } from './health.controller';
+import { FinanceModule } from './finance/finance.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { HealthController } from './health.controller';
     TasksModule,
     EventsModule,
     TransactionsModule,
+    FinanceModule,
     SearchModule,
   ],
   controllers: [HealthController],

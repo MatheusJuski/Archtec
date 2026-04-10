@@ -100,6 +100,24 @@ interface ExpensesByCategoryResponse {
   items: ExpensesByCategoryItem[]
 }
 
+interface MonthlyGoal {
+  id: string
+  month: number
+  year: number
+  category: string
+  targetAmount: number
+}
+
+interface AccountEntry {
+  id: string
+  type: "PAYABLE" | "RECEIVABLE"
+  status: "PENDING" | "PAID" | "OVERDUE"
+  amount: number
+  category: string
+  description: string | null
+  dueDate: string
+}
+
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -118,6 +136,17 @@ export function FinancePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [savingGoal, setSavingGoal] = useState(false)
+  const [savingAccount, setSavingAccount] = useState(false)
+  const [goals, setGoals] = useState<MonthlyGoal[]>([])
+  const [accounts, setAccounts] = useState<AccountEntry[]>([])
+  const [goalCategory, setGoalCategory] = useState("")
+  const [goalAmount, setGoalAmount] = useState("")
+  const [accountType, setAccountType] = useState<"PAYABLE" | "RECEIVABLE">("PAYABLE")
+  const [accountCategory, setAccountCategory] = useState("")
+  const [accountDescription, setAccountDescription] = useState("")
+  const [accountAmount, setAccountAmount] = useState("")
+  const [accountDueDate, setAccountDueDate] = useState(new Date().toISOString().slice(0, 10))
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null)
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null)
@@ -142,13 +171,21 @@ export function FinancePage() {
   const isRecurring = form.watch("isRecurring")
 
   const fetchTransactions = useCallback(async () => {
-    const [transactionsRes, expensesRes] = await Promise.all([
+    const now = new Date()
+    const month = now.getMonth() + 1
+    const year = now.getFullYear()
+
+    const [transactionsRes, expensesRes, goalsRes, accountsRes] = await Promise.all([
       api.get<Transaction[]>('/transactions'),
       api.get<ExpensesByCategoryResponse>('/transactions/expenses-by-category'),
+      api.get<MonthlyGoal[]>('/finance/goals', { params: { month, year } }),
+      api.get<AccountEntry[]>('/finance/accounts', { params: { month, year } }),
     ])
 
     setTransactions(transactionsRes.data)
     setExpensesByCategory(expensesRes.data.items)
+    setGoals(goalsRes.data)
+    setAccounts(accountsRes.data)
     setExpensesMonth({
       month: expensesRes.data.month,
       year: expensesRes.data.year,
@@ -248,6 +285,105 @@ export function FinancePage() {
       toast.error(Array.isArray(message) ? message[0] : message || "Erro ao excluir transação")
     } finally {
       setDeleting(false)
+    }
+  }
+
+  async function handleSaveGoal() {
+    const category = goalCategory.trim()
+    const amount = Number(goalAmount.replace(',', '.'))
+    const now = new Date()
+
+    if (!category || !Number.isFinite(amount) || amount <= 0) {
+      toast.error('Preencha categoria e valor da meta corretamente')
+      return
+    }
+
+    setSavingGoal(true)
+    try {
+      await api.post('/finance/goals', {
+        category,
+        targetAmount: amount,
+        month: now.getMonth() + 1,
+        year: now.getFullYear(),
+      })
+      setGoalCategory('')
+      setGoalAmount('')
+      await fetchTransactions()
+      toast.success('Meta salva com sucesso')
+    } catch {
+      toast.error('Erro ao salvar meta')
+    } finally {
+      setSavingGoal(false)
+    }
+  }
+
+  async function handleDeleteGoal(goalId: string) {
+    setSavingGoal(true)
+    try {
+      await api.delete(`/finance/goals/${goalId}`)
+      await fetchTransactions()
+      toast.success('Meta removida')
+    } catch {
+      toast.error('Erro ao remover meta')
+    } finally {
+      setSavingGoal(false)
+    }
+  }
+
+  async function handleSaveAccount() {
+    const category = accountCategory.trim()
+    const amount = Number(accountAmount.replace(',', '.'))
+    if (!category || !Number.isFinite(amount) || amount <= 0 || !accountDueDate) {
+      toast.error('Preencha os dados do lançamento corretamente')
+      return
+    }
+
+    setSavingAccount(true)
+    try {
+      await api.post('/finance/accounts', {
+        type: accountType,
+        category,
+        description: accountDescription.trim() || undefined,
+        amount,
+        dueDate: new Date(`${accountDueDate}T12:00:00`).toISOString(),
+      })
+      setAccountCategory('')
+      setAccountDescription('')
+      setAccountAmount('')
+      setAccountType('PAYABLE')
+      setAccountDueDate(new Date().toISOString().slice(0, 10))
+      await fetchTransactions()
+      toast.success('Lançamento salvo')
+    } catch {
+      toast.error('Erro ao salvar lançamento')
+    } finally {
+      setSavingAccount(false)
+    }
+  }
+
+  async function handleMarkAccountPaid(id: string) {
+    setSavingAccount(true)
+    try {
+      await api.post(`/finance/accounts/${id}/pay`)
+      await fetchTransactions()
+      toast.success('Lançamento marcado como pago')
+    } catch {
+      toast.error('Erro ao atualizar lançamento')
+    } finally {
+      setSavingAccount(false)
+    }
+  }
+
+  async function handleDeleteAccount(id: string) {
+    setSavingAccount(true)
+    try {
+      await api.delete(`/finance/accounts/${id}`)
+      await fetchTransactions()
+      toast.success('Lançamento removido')
+    } catch {
+      toast.error('Erro ao remover lançamento')
+    } finally {
+      setSavingAccount(false)
     }
   }
 
@@ -356,6 +492,21 @@ export function FinancePage() {
   const chartTotal = useMemo(() => {
     return expensesByCategory.reduce((sum, item) => sum + item.amount, 0)
   }, [expensesByCategory])
+
+  const spentByCategory = useMemo(() => {
+    const now = new Date()
+    return transactions.reduce<Record<string, number>>((acc, tx) => {
+      const txDate = new Date(tx.occurredAt)
+      if (
+        tx.type === 'EXPENSE' &&
+        txDate.getMonth() === now.getMonth() &&
+        txDate.getFullYear() === now.getFullYear()
+      ) {
+        acc[tx.category] = (acc[tx.category] ?? 0) + tx.amount
+      }
+      return acc
+    }, {})
+  }, [transactions])
 
   return (
     <div className="mx-auto flex h-full w-full max-w-350 flex-col gap-4 p-6">
@@ -493,6 +644,103 @@ export function FinancePage() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
+          <h2 className="font-heading text-sm tracking-wider text-foreground">Metas financeiras mensais</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+            <Input
+              placeholder="Categoria da meta"
+              value={goalCategory}
+              onChange={(e) => setGoalCategory(e.target.value)}
+            />
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Valor da meta"
+              value={goalAmount}
+              onChange={(e) => setGoalAmount(e.target.value)}
+            />
+            <Button onClick={handleSaveGoal} disabled={savingGoal}>Salvar</Button>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {goals.length === 0 ? (
+              <p className="text-sm text-relic">Nenhuma meta cadastrada para este mês.</p>
+            ) : (
+              goals.map((goal) => {
+                const spent = spentByCategory[goal.category] ?? 0
+                const progress = goal.targetAmount > 0 ? Math.min((spent / goal.targetAmount) * 100, 100) : 0
+                return (
+                  <div key={goal.id} className="rounded-lg border border-border/50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">{goal.category}</p>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteGoal(goal.id)}>Remover</Button>
+                    </div>
+                    <p className="text-xs text-relic">
+                      {currencyFormatter.format(spent)} de {currencyFormatter.format(goal.targetAmount)}
+                    </p>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-background/70">
+                      <div
+                        className={`h-full ${progress >= 100 ? 'bg-ember' : progress >= 80 ? 'bg-arcane' : 'bg-toxic'}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
+          <h2 className="font-heading text-sm tracking-wider text-foreground">Contas a pagar e receber</h2>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <select className="arch-picker" value={accountType} onChange={(e) => setAccountType(e.target.value as 'PAYABLE' | 'RECEIVABLE')}>
+              <option value="PAYABLE">A pagar</option>
+              <option value="RECEIVABLE">A receber</option>
+            </select>
+            <Input placeholder="Categoria" value={accountCategory} onChange={(e) => setAccountCategory(e.target.value)} />
+            <Input placeholder="Descrição" value={accountDescription} onChange={(e) => setAccountDescription(e.target.value)} />
+            <Input type="number" step="0.01" min="0" placeholder="Valor" value={accountAmount} onChange={(e) => setAccountAmount(e.target.value)} />
+            <Input type="date" value={accountDueDate} onChange={(e) => setAccountDueDate(e.target.value)} />
+            <Button onClick={handleSaveAccount} disabled={savingAccount}>Salvar lançamento</Button>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {accounts.length === 0 ? (
+              <p className="text-sm text-relic">Nenhum lançamento no mês atual.</p>
+            ) : (
+              accounts.map((entry) => (
+                <div key={entry.id} className="rounded-lg border border-border/50 p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium text-foreground">
+                      {entry.type === 'PAYABLE' ? 'Pagar' : 'Receber'} - {entry.category}
+                    </p>
+                    <p className={`text-xs ${entry.status === 'PAID' ? 'text-toxic' : entry.status === 'OVERDUE' ? 'text-ember' : 'text-arcane'}`}>
+                      {entry.status === 'PAID' ? 'Pago' : entry.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
+                    </p>
+                  </div>
+                  <p className="text-xs text-relic">Vencimento: {dateFormatter.format(new Date(entry.dueDate))}</p>
+                  <p className="text-sm font-semibold text-foreground">{currencyFormatter.format(entry.amount)}</p>
+                  <div className="mt-2 flex gap-2">
+                    {entry.status !== 'PAID' ? (
+                      <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
+                        Marcar pago
+                      </Button>
+                    ) : null}
+                    <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>
+                      Remover
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
 
       <Dialog

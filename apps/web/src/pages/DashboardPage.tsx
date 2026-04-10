@@ -22,6 +22,18 @@ interface TransactionsSummary {
   balance: number;
 }
 
+interface HealthSummary {
+  tasksOverdue: number;
+  tasksDueToday: number;
+  eventsToday: number;
+  notesTotal: number;
+  monthIncome: number;
+  monthExpense: number;
+  monthBalance: number;
+  receivableOpen: number;
+  payableOpen: number;
+}
+
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -36,6 +48,7 @@ export function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [summary, setSummary] = useState<TransactionsSummary | null>(null);
+  const [healthSummary, setHealthSummary] = useState<HealthSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -43,8 +56,9 @@ export function DashboardPage() {
       api.get("/events"),
       api.get("/tasks"),
       api.get<TransactionsSummary>("/transactions/summary"),
+      api.get<HealthSummary>("/finance/health-summary"),
     ])
-      .then(([eventsRes, tasksRes, summaryRes]) => {
+      .then(([eventsRes, tasksRes, summaryRes, healthRes]) => {
         setEvents(eventsRes.data);
         setTasks(tasksRes.data);
         setSummary({
@@ -53,6 +67,14 @@ export function DashboardPage() {
           income: Number(summaryRes.data.income),
           expense: Number(summaryRes.data.expense),
           balance: Number(summaryRes.data.balance),
+        });
+        setHealthSummary({
+          ...healthRes.data,
+          monthIncome: Number(healthRes.data.monthIncome),
+          monthExpense: Number(healthRes.data.monthExpense),
+          monthBalance: Number(healthRes.data.monthBalance),
+          receivableOpen: Number(healthRes.data.receivableOpen),
+          payableOpen: Number(healthRes.data.payableOpen),
         });
       })
       .finally(() => setLoading(false));
@@ -130,6 +152,42 @@ export function DashboardPage() {
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground">Período: {monthLabel}</p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Tarefas vencidas</p>
+            <p className="mt-2 text-xl font-semibold text-ember">{healthSummary?.tasksOverdue ?? 0}</p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Tarefas para hoje</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{healthSummary?.tasksDueToday ?? todayTasks.length}</p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Eventos hoje</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{healthSummary?.eventsToday ?? todayEvents.length}</p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Notas totais</p>
+            <p className="mt-2 text-xl font-semibold text-foreground">{healthSummary?.notesTotal ?? 0}</p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">A receber em aberto</p>
+            <p className="mt-2 text-xl font-semibold text-toxic">
+              {currencyFormatter.format(healthSummary?.receivableOpen ?? 0)}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-border/60 bg-background/60 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">A pagar em aberto</p>
+            <p className="mt-2 text-xl font-semibold text-ember">
+              {currencyFormatter.format(healthSummary?.payableOpen ?? 0)}
+            </p>
+          </div>
+        </div>
       </section>
 
       <div className="lg:justify-self-end lg:w-full">

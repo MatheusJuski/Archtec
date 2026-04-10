@@ -16,7 +16,14 @@ export class TasksController {
   @Post()
   create(
     @Request() req,
-    @Body() body: { title: string; parentId?: string | null },
+    @Body()
+    body: {
+      title: string;
+      parentId?: string | null;
+      dueDate?: string | null;
+      isRecurring?: boolean;
+      recurrenceFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
+    },
   ) {
     return this.tasksService.createTask(req.user.userId, body);
   }

@@ -1,4 +1,11 @@
-import { IsDateString, IsNotEmpty, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
+
+export enum EventRecurrenceFrequency {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+}
 
 export class CreateEventDto {
   @IsString()
@@ -22,4 +29,12 @@ export class CreateEventDto {
   @IsOptional()
   @IsUUID()
   noteId?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @ValidateIf((o: CreateEventDto) => o.isRecurring === true)
+  @IsEnum(EventRecurrenceFrequency)
+  recurrenceFrequency?: EventRecurrenceFrequency;
 }

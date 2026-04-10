@@ -19,6 +19,8 @@ model User {
   events    Event[]
   transactions Transaction[]
   categories Category[]
+  monthlyGoals MonthlyGoal[]
+  accountEntries AccountEntry[]
 
   @@map("users")
 }
@@ -33,6 +35,17 @@ enum RecurrenceFrequency {
   WEEKLY
   MONTHLY
   YEARLY
+}
+
+enum AccountEntryType {
+  PAYABLE
+  RECEIVABLE
+}
+
+enum AccountEntryStatus {
+  PENDING
+  PAID
+  OVERDUE
 }
 
 model Note {
@@ -68,6 +81,8 @@ model Task {
   priority    String   @default("medium") 
   order       Float    @default(0)
   dueDate     DateTime?
+  isRecurring Boolean  @default(false)
+  recurrenceFrequency RecurrenceFrequency?
   completedAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -93,6 +108,8 @@ model Event {
   description String?
   startTime DateTime
   endTime   DateTime
+  isRecurring Boolean @default(false)
+  recurrenceFrequency RecurrenceFrequency?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -152,4 +169,42 @@ model Category {
   @@map("categories")
   @@index([userId])
   @@unique([userId, name])
+}
+
+model MonthlyGoal {
+  id           String   @id @default(uuid())
+  month        Int
+  year         Int
+  category     String
+  targetAmount Float
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("monthly_goals")
+  @@index([userId, month, year])
+  @@unique([userId, month, year, category])
+}
+
+model AccountEntry {
+  id          String            @id @default(uuid())
+  type        AccountEntryType
+  status      AccountEntryStatus @default(PENDING)
+  amount      Float
+  category    String
+  description String?
+  dueDate     DateTime
+  paidAt      DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  userId      String
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("account_entries")
+  @@index([userId, dueDate])
+  @@index([userId, status])
+  @@index([userId, type])
 }
