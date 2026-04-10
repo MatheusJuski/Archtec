@@ -7,6 +7,7 @@ import { EventsModule } from './events/events.module';
 import { TransactionsModule } from './transactions/transactions.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { SearchModule } from './search/search.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -19,7 +20,7 @@ import { SearchModule } from './search/search.module';
     TransactionsModule,
     SearchModule,
   ],
-  controllers: [],
+  controllers: [HealthController],
   providers: [],
 })
 export class AppModule {}
