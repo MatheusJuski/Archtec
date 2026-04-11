@@ -199,4 +199,69 @@ export class FinanceService {
       payableOpen,
     };
   }
+
+  async monthInsights(userId: string, month?: number, year?: number) {
+    await this.markOverdue(userId);
+
+    const now = new Date();
+    const targetMonth = month ?? now.getMonth() + 1;
+    const targetYear = year ?? now.getFullYear();
+
+    const startMonth = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
+    const endMonth = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+    const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
+    const elapsedDays =
+      now.getMonth() + 1 === targetMonth && now.getFullYear() === targetYear
+        ? Math.max(now.getDate(), 1)
+        : daysInMonth;
+
+    const grouped = await this.prisma.transaction.groupBy({
+      by: ['type'],
+      where: {
+        userId,
+        occurredAt: { gte: startMonth, lt: endMonth },
+      },
+      _sum: { amount: true },
+    });
+
+    const income = grouped.find((g) => g.type === 'INCOME')?._sum.amount ?? 0;
+    const expense = grouped.find((g) => g.type === 'EXPENSE')?._sum.amount ?? 0;
+
+    const dailyExpenseAverage = elapsedDays > 0 ? expense / elapsedDays : 0;
+    const projectedExpense = dailyExpenseAverage * daysInMonth;
+
+    const startToday = new Date(now);
+    startToday.setHours(0, 0, 0, 0);
+    const nextWeek = new Date(startToday);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const [overdueCount, dueSoonCount] = await Promise.all([
+      this.prisma.accountEntry.count({
+        where: {
+          userId,
+          status: 'OVERDUE',
+        },
+      }),
+      this.prisma.accountEntry.count({
+        where: {
+          userId,
+          status: 'PENDING',
+          dueDate: { gte: startToday, lte: nextWeek },
+        },
+      }),
+    ]);
+
+    return {
+      month: targetMonth,
+      year: targetYear,
+      income,
+      expense,
+      projectedExpense,
+      projectedBalance: income - projectedExpense,
+      overdueCount,
+      dueSoonCount,
+      daysInMonth,
+      elapsedDays,
+    };
+  }
 }

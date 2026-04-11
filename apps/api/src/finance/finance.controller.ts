@@ -53,4 +53,11 @@ export class FinanceController {
   healthSummary(@Request() req) {
     return this.financeService.healthSummary(req.user.userId);
   }
+
+  @Get('insights')
+  insights(@Request() req, @Query('month') month?: string, @Query('year') year?: string) {
+    const parsedMonth = month ? Number(month) : undefined;
+    const parsedYear = year ? Number(year) : undefined;
+    return this.financeService.monthInsights(req.user.userId, parsedMonth, parsedYear);
+  }
 }

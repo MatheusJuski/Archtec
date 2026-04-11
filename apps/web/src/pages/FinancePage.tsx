@@ -118,6 +118,19 @@ interface AccountEntry {
   dueDate: string
 }
 
+interface FinanceInsights {
+  month: number
+  year: number
+  income: number
+  expense: number
+  projectedExpense: number
+  projectedBalance: number
+  overdueCount: number
+  dueSoonCount: number
+  daysInMonth: number
+  elapsedDays: number
+}
+
 const currencyFormatter = new Intl.NumberFormat("pt-BR", {
   style: "currency",
   currency: "BRL",
@@ -138,6 +151,7 @@ export function FinancePage() {
   const [deleting, setDeleting] = useState(false)
   const [savingGoal, setSavingGoal] = useState(false)
   const [savingAccount, setSavingAccount] = useState(false)
+  const [insights, setInsights] = useState<FinanceInsights | null>(null)
   const [goals, setGoals] = useState<MonthlyGoal[]>([])
   const [accounts, setAccounts] = useState<AccountEntry[]>([])
   const [goalCategory, setGoalCategory] = useState("")
@@ -175,17 +189,19 @@ export function FinancePage() {
     const month = now.getMonth() + 1
     const year = now.getFullYear()
 
-    const [transactionsRes, expensesRes, goalsRes, accountsRes] = await Promise.all([
+    const [transactionsRes, expensesRes, goalsRes, accountsRes, insightsRes] = await Promise.all([
       api.get<Transaction[]>('/transactions'),
       api.get<ExpensesByCategoryResponse>('/transactions/expenses-by-category'),
       api.get<MonthlyGoal[]>('/finance/goals', { params: { month, year } }),
       api.get<AccountEntry[]>('/finance/accounts', { params: { month, year } }),
+      api.get<FinanceInsights>('/finance/insights', { params: { month, year } }),
     ])
 
     setTransactions(transactionsRes.data)
     setExpensesByCategory(expensesRes.data.items)
     setGoals(goalsRes.data)
     setAccounts(accountsRes.data)
+    setInsights(insightsRes.data)
     setExpensesMonth({
       month: expensesRes.data.month,
       year: expensesRes.data.year,
@@ -508,6 +524,46 @@ export function FinancePage() {
     }, {})
   }, [transactions])
 
+  function getAccountVisualState(entry: AccountEntry) {
+    if (entry.status === 'PAID') {
+      return {
+        cardClass: 'border-toxic/40 bg-toxic/8',
+        badgeClass: 'bg-toxic/15 text-toxic border-toxic/40',
+        label: 'Pago',
+      }
+    }
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const dueDate = new Date(entry.dueDate)
+    dueDate.setHours(0, 0, 0, 0)
+
+    const dayDiff = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+
+    if (entry.status === 'OVERDUE' || dayDiff < 0) {
+      return {
+        cardClass: 'border-ember/50 bg-ember/8',
+        badgeClass: 'bg-ember/15 text-ember border-ember/40',
+        label: 'Atrasado',
+      }
+    }
+
+    if (dayDiff <= 7) {
+      return {
+        cardClass: 'border-arcane/50 bg-arcane/8',
+        badgeClass: 'bg-arcane/15 text-arcane border-arcane/40',
+        label: 'Vence em breve',
+      }
+    }
+
+    return {
+      cardClass: 'border-border/50 bg-background/20',
+      badgeClass: 'bg-background/70 text-relic border-border/60',
+      label: 'Pendente',
+    }
+  }
+
   return (
     <div className="mx-auto flex h-full w-full max-w-350 flex-col gap-4 p-6">
       <div className="flex items-center gap-3">
@@ -648,6 +704,51 @@ export function FinancePage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-xl border border-border/60 bg-card/70 p-4">
+          <h2 className="font-heading text-sm tracking-wider text-foreground">Projeção do mês</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-relic">Despesa atual</p>
+              <p className="mt-1 text-lg font-semibold text-ember">
+                {currencyFormatter.format(insights?.expense ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-relic">Despesa projetada</p>
+              <p className="mt-1 text-lg font-semibold text-arcane">
+                {currencyFormatter.format(insights?.projectedExpense ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background/40 p-3 sm:col-span-2">
+              <p className="text-xs uppercase tracking-wide text-relic">Saldo projetado</p>
+              <p className={`mt-1 text-xl font-semibold ${(insights?.projectedBalance ?? 0) >= 0 ? 'text-toxic' : 'text-ember'}`}>
+                {currencyFormatter.format(insights?.projectedBalance ?? 0)}
+              </p>
+              <p className="mt-1 text-xs text-relic">
+                Baseado em {insights?.elapsedDays ?? 0} de {insights?.daysInMonth ?? 0} dias do mês
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
+          <h2 className="font-heading text-sm tracking-wider text-foreground">Alertas financeiros</h2>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-relic">Contas atrasadas</p>
+              <p className={`mt-1 text-2xl font-semibold ${(insights?.overdueCount ?? 0) > 0 ? 'text-ember' : 'text-toxic'}`}>
+                {insights?.overdueCount ?? 0}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <p className="text-xs uppercase tracking-wide text-relic">Vencendo em 7 dias</p>
+              <p className={`mt-1 text-2xl font-semibold ${(insights?.dueSoonCount ?? 0) > 0 ? 'text-arcane' : 'text-toxic'}`}>
+                {insights?.dueSoonCount ?? 0}
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
           <h2 className="font-heading text-sm tracking-wider text-foreground">Metas financeiras mensais</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
             <Input
@@ -714,30 +815,34 @@ export function FinancePage() {
             {accounts.length === 0 ? (
               <p className="text-sm text-relic">Nenhum lançamento no mês atual.</p>
             ) : (
-              accounts.map((entry) => (
-                <div key={entry.id} className="rounded-lg border border-border/50 p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-foreground">
-                      {entry.type === 'PAYABLE' ? 'Pagar' : 'Receber'} - {entry.category}
-                    </p>
-                    <p className={`text-xs ${entry.status === 'PAID' ? 'text-toxic' : entry.status === 'OVERDUE' ? 'text-ember' : 'text-arcane'}`}>
-                      {entry.status === 'PAID' ? 'Pago' : entry.status === 'OVERDUE' ? 'Atrasado' : 'Pendente'}
-                    </p>
-                  </div>
-                  <p className="text-xs text-relic">Vencimento: {dateFormatter.format(new Date(entry.dueDate))}</p>
-                  <p className="text-sm font-semibold text-foreground">{currencyFormatter.format(entry.amount)}</p>
-                  <div className="mt-2 flex gap-2">
-                    {entry.status !== 'PAID' ? (
-                      <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
-                        Marcar pago
+              accounts.map((entry) => {
+                const visual = getAccountVisualState(entry)
+
+                return (
+                  <div key={entry.id} className={`rounded-lg border p-3 ${visual.cardClass}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-foreground">
+                        {entry.type === 'PAYABLE' ? 'Pagar' : 'Receber'} - {entry.category}
+                      </p>
+                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>
+                        {visual.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-relic">Vencimento: {dateFormatter.format(new Date(entry.dueDate))}</p>
+                    <p className="text-sm font-semibold text-foreground">{currencyFormatter.format(entry.amount)}</p>
+                    <div className="mt-2 flex gap-2">
+                      {entry.status !== 'PAID' ? (
+                        <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
+                          Marcar pago
+                        </Button>
+                      ) : null}
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>
+                        Remover
                       </Button>
-                    ) : null}
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>
-                      Remover
-                    </Button>
+                    </div>
                   </div>
-                </div>
-              ))
+                )
+              })
             )}
           </div>
         </section>
