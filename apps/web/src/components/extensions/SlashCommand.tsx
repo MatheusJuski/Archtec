@@ -122,29 +122,29 @@ const CommandList = forwardRef((props: any, ref) => {
   }))
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg shadow-2xl overflow-hidden min-w-56 p-1">
+    <div className="min-w-60 overflow-hidden border border-ink bg-popover p-1 text-popover-foreground shadow-[3px_3px_0_0_var(--ink)]">
       {props.items.length ? (
         props.items.map((item: any, index: number) => (
           <button
             key={index}
-            className={`flex items-center gap-3 w-full text-left px-3 py-2 text-sm rounded-md transition-colors ${
-              index === selectedIndex ? 'bg-blue-600/20 text-blue-300' : 'text-slate-300 hover:bg-white/5'
+            className={`flex w-full items-center gap-3 px-2.5 py-2 text-left text-sm transition-colors ${
+              index === selectedIndex ? 'bg-ink text-surface-1' : 'text-foreground hover:bg-surface-2'
             }`}
             onClick={() => selectItem(index)}
           >
-            <span className={`shrink-0 ${index === selectedIndex ? 'text-blue-400' : 'text-slate-500'}`}>
+            <span className={`shrink-0 ${index === selectedIndex ? 'text-brand' : 'text-muted-foreground'}`}>
               {item.icon}
             </span>
             <div className="flex flex-col">
               <span className="font-medium">{item.title}</span>
               {item.description && (
-                <span className="text-xs text-slate-500">{item.description}</span>
+                <span className="text-xs opacity-60">{item.description}</span>
               )}
             </div>
           </button>
         ))
       ) : (
-        <div className="px-3 py-2 text-sm text-slate-500">Sem resultados</div>
+        <div className="label-tech px-3 py-3 text-muted-foreground">Sem resultados</div>
       )}
     </div>
   )

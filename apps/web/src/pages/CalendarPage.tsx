@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -249,8 +253,8 @@ function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<Calen
     <div className="arch-toolbar">
       <div className="arch-toolbar__nav">
         <button type="button" onClick={() => onNavigate("TODAY")}>Hoje</button>
-        <button type="button" onClick={() => onNavigate("PREV")}>Anterior</button>
-        <button type="button" onClick={() => onNavigate("NEXT")}>Próximo</button>
+        <button type="button" onClick={() => onNavigate("PREV")} aria-label="Anterior"><ChevronLeft className="size-3.5" /></button>
+        <button type="button" onClick={() => onNavigate("NEXT")} aria-label="Próximo"><ChevronRight className="size-3.5" /></button>
       </div>
 
       <div className="arch-toolbar__label">{capitalizeLabel(label)}</div>
@@ -283,6 +287,9 @@ function CalendarToolbar({ label, onNavigate, onView, view }: ToolbarProps<Calen
 }
 
 export function CalendarPage() {
+  const [pendingDelete, setPendingDelete] = useState<
+    { kind: "one"; event: CalendarEvent } | { kind: "all" } | null
+  >(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tasks, setTasks] = useState<FlatTask[]>([]);
   const [notes, setNotes] = useState<NoteFromApi[]>([]);
@@ -588,12 +595,11 @@ export function CalendarPage() {
     }
   }
 
-  async function handleDeleteEvent(event: CalendarEvent) {
-    const confirmDelete = window.confirm(
-      `Excluir o evento "${event.title}"? Esta ação não pode ser desfeita.`,
-    );
-    if (!confirmDelete) return;
+  function handleDeleteEvent(event: CalendarEvent) {
+    setPendingDelete({ kind: "one", event });
+  }
 
+  async function performDeleteEvent(event: CalendarEvent) {
     setIsSaving(true);
     try {
       await api.delete(`/events/${event.id}`);
@@ -603,6 +609,7 @@ export function CalendarPage() {
       toast.error("Erro ao excluir evento");
     } finally {
       setIsSaving(false);
+      setPendingDelete(null);
     }
   }
 
@@ -612,11 +619,10 @@ export function CalendarPage() {
       return;
     }
 
-    const confirmDeleteAll = window.confirm(
-      "Limpar todos os eventos do calendário? Esta ação não pode ser desfeita.",
-    );
-    if (!confirmDeleteAll) return;
+    setPendingDelete({ kind: "all" });
+  }
 
+  async function performDeleteAllEvents() {
     setIsSaving(true);
     try {
       const res = await api.delete<{ deletedCount: number }>("/events");
@@ -626,6 +632,7 @@ export function CalendarPage() {
       toast.error("Erro ao limpar eventos");
     } finally {
       setIsSaving(false);
+      setPendingDelete(null);
     }
   }
 
@@ -665,33 +672,34 @@ export function CalendarPage() {
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="mx-auto flex h-full w-full max-w-450 flex-col gap-4 p-6">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-linear-to-b from-arcane to-arcane/20" />
-          <h1 className="font-heading text-2xl font-bold tracking-wider text-foreground">
-            Calendário
-          </h1>
-          <Button
-            type="button"
-            variant="outline"
-            className="ml-auto"
-            onClick={handleDeleteAllEvents}
-            disabled={isSaving || events.length === 0}
-          >
-            {isSaving ? "Processando..." : "Limpar eventos"}
-          </Button>
-        </div>
+      <div className="h-full overflow-y-auto">
+      <div className="mx-auto flex min-h-full w-full max-w-450 flex-col px-5 py-8 md:px-10 md:py-12">
+        <PageHeader
+          eyebrow="04 / Calendário"
+          title="Calendário"
+          description="Arraste tarefas para a agenda para criar blocos de tempo."
+          actions={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDeleteAllEvents}
+              disabled={isSaving || events.length === 0}
+            >
+              Limpar eventos
+            </Button>
+          }
+        />
 
         <div className="arch-calendar-layout">
           <aside className="arch-task-sidebar">
             <div className="arch-task-sidebar__header">
-              <h2 className="font-heading text-sm tracking-wider text-foreground">Tarefas</h2>
-              <span className="text-xs text-relic">{selectedTaskCount}</span>
+              <h2 className="chip chip-offset">Tarefas</h2>
+              <span className="label-tech tabular-nums text-muted-foreground">{String(selectedTaskCount).padStart(2, "0")}</span>
             </div>
 
             <div className="arch-task-sidebar__list">
               {tasks.length === 0 ? (
-                <p className="text-sm text-relic">Nenhuma tarefa para arrastar.</p>
+                <p className="hatch border border-dashed border-line px-3 py-6 text-center text-xs text-muted-foreground">Nenhuma tarefa para arrastar.</p>
               ) : (
                 tasks.map((task) => <DraggableTask key={task.id} task={task} />)
               )}
@@ -703,10 +711,10 @@ export function CalendarPage() {
               setCalendarDropRef(node);
               calendarDropContainerRef.current = node;
             }}
-            className={`arch-calendar flex-1 overflow-hidden rounded-xl border border-border/60 bg-card/60 p-3 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.8)] ${isOver ? "arch-calendar--drop-over" : ""}`}
+            className={`arch-calendar flex-1 overflow-hidden ${isOver ? "arch-calendar--drop-over" : ""}`}
           >
             {loading ? (
-              <div className="flex h-full items-center justify-center text-relic">Carregando eventos...</div>
+              <Skeleton className="h-full min-h-[60vh] border border-line" />
             ) : (
               <>
                 <BigCalendar
@@ -734,9 +742,9 @@ export function CalendarPage() {
                 />
 
                 <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogContent className="border-border bg-card/95 text-foreground backdrop-blur">
+                  <DialogContent>
                     <DialogHeader>
-                      <DialogTitle className="font-heading tracking-wide">Novo Evento</DialogTitle>
+                      <DialogTitle>Novo evento</DialogTitle>
                       <DialogDescription>
                         Preencha os dados para criar um evento no calendário.
                       </DialogDescription>
@@ -853,7 +861,7 @@ export function CalendarPage() {
                               <FormItem>
                                 <FormLabel>Recorrência</FormLabel>
                                 <FormControl>
-                                  <label className="flex h-10 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm">
+                                  <label className="flex h-10 cursor-pointer items-center gap-2.5 border border-input bg-card px-3 text-sm">
                                     <input
                                       type="checkbox"
                                       checked={Boolean(field.value)}
@@ -895,7 +903,7 @@ export function CalendarPage() {
                           )}
                         </div>
 
-                        <p className="text-xs text-relic">
+                        <p className="label-tech text-muted-foreground">
                           Janela permitida: de 1 dia atrás até {EVENT_FUTURE_LIMIT_YEARS} anos no futuro.
                         </p>
 
@@ -927,6 +935,24 @@ export function CalendarPage() {
             </div>
           ) : null}
         </DragOverlay>
+
+        <ConfirmDialog
+          open={pendingDelete !== null}
+          onOpenChange={(open) => !open && setPendingDelete(null)}
+          title={pendingDelete?.kind === "all" ? "Limpar todos os eventos?" : "Excluir evento?"}
+          description={
+            pendingDelete?.kind === "one"
+              ? `"${pendingDelete.event.title}" será removido. Esta ação não pode ser desfeita.`
+              : "Todos os eventos do calendário serão removidos. Esta ação não pode ser desfeita."
+          }
+          confirmLabel={pendingDelete?.kind === "all" ? "Limpar tudo" : "Excluir"}
+          loading={isSaving}
+          onConfirm={() => {
+            if (pendingDelete?.kind === "one") void performDeleteEvent(pendingDelete.event);
+            else if (pendingDelete?.kind === "all") void performDeleteAllEvents();
+          }}
+        />
+      </div>
       </div>
     </DndContext>
   );

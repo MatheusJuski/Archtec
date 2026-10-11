@@ -221,32 +221,32 @@ const MentionList = forwardRef((props: any, ref) => {
   }))
 
   return (
-    <div className="min-w-64 overflow-hidden rounded-lg border border-slate-800 bg-slate-900 p-1 shadow-2xl">
+    <div className="min-w-64 overflow-hidden border border-ink bg-popover p-1 text-popover-foreground shadow-[3px_3px_0_0_var(--ink)]">
       {props.items.length ? (
         props.items.map((item: any, index: number) => (
           <button
             key={item.id}
-            className={`flex w-full items-start gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors ${
+            className={`flex w-full items-start gap-3 px-2.5 py-2 text-left text-sm transition-colors ${
               index === selectedIndex
-                ? 'bg-blue-600/20 text-blue-300'
-                : 'text-slate-300 hover:bg-white/5'
+                ? 'bg-ink text-surface-1'
+                : 'text-foreground hover:bg-surface-2'
             }`}
             onClick={() => selectItem(index)}
             type="button"
           >
-            <span className={index === selectedIndex ? 'text-blue-400' : 'text-slate-500'}>
+            <span className={index === selectedIndex ? 'text-brand' : 'text-muted-foreground'}>
               {item.icon}
             </span>
             <div className="min-w-0">
               <span className="block truncate font-medium">{toMentionLabel(item)}</span>
-              <span className="block truncate text-xs text-slate-500">
-                {item.preview || 'Sem conteudo'}
+              <span className="block truncate text-xs opacity-60">
+                {item.preview || 'Sem conteúdo'}
               </span>
             </div>
           </button>
         ))
       ) : (
-        <div className="px-3 py-2 text-sm text-slate-500">Nenhuma nota encontrada</div>
+        <div className="label-tech px-3 py-3 text-muted-foreground">Nenhuma nota encontrada</div>
       )}
     </div>
   )

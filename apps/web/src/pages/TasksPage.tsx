@@ -10,6 +10,11 @@ import {
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { motion } from "motion/react";
+import { PageHeader } from "@/components/ui/page-header";
+import { Panel } from "@/components/ui/panel";
+import { Divider } from "@/components/ui/divider";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   DndContext,
   closestCenter,
@@ -289,134 +294,146 @@ export function TasksPage() {
     return found?.task ?? null;
   })() : null;
 
+  const counts = (function count(list: Task[]): { total: number; done: number } {
+    return list.reduce(
+      (acc, t) => {
+        const sub = count(t.children ?? []);
+        return {
+          total: acc.total + 1 + sub.total,
+          done: acc.done + (t.status === "completed" ? 1 : 0) + sub.done,
+        };
+      },
+      { total: 0, done: 0 },
+    );
+  })(tasks);
+  const progress = counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : 0;
+
   return (
-    <div className="mx-auto flex h-full max-w-4xl flex-col gap-6 p-6 overflow-hidden">
-      {/* ═══ Header ═══ */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-1 rounded-full bg-linear-to-b from-arcane to-arcane/20" />
-          <h1 className="font-heading text-2xl font-bold tracking-wider text-foreground">
-            Tarefas
-          </h1>
-        </div>
-      </div>
-
-      {/* ═══ Input de nova tarefa ═══ */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <input
-            ref={inputRef}
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            placeholder="Nova tarefa..."
-            className="
-              w-full rounded-sm border border-border bg-card px-4 py-2.5
-              text-sm text-foreground placeholder:text-muted-foreground
-              focus:outline-none focus:ring-1 focus:ring-arcane/50 focus:border-arcane/50
-              transition-all
-            "
-            disabled={creating}
-          />
-          <div className="absolute bottom-0 left-4 right-4 h-px bg-linear-to-r from-transparent via-arcane/20 to-transparent" />
-        </div>
-        <Button
-          onClick={handleCreate}
-          disabled={creating || !newTitle.trim()}
-          className="
-            bg-arcane text-primary-foreground hover:bg-arcane-glow
-            disabled:opacity-40 rounded-sm px-4 h-10
-            transition-all
-          "
-        >
-          {creating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4" />
-          )}
-        </Button>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-3">
-        <Input
-          type="date"
-          value={newDueDate}
-          onChange={(e) => setNewDueDate(e.target.value)}
-          className="h-9"
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-5 py-8 md:px-10 md:py-12">
+        <PageHeader
+          eyebrow="03 / Tarefas"
+          title="Tarefas"
+          description="Arraste para reordenar. Tab e Shift+Tab ajustam a hierarquia."
+          actions={
+            counts.total > 0 && (
+              <div className="flex items-center gap-3">
+                <span className="label-tech tabular-nums text-muted-foreground">
+                  {counts.done}/{counts.total} concluídas
+                </span>
+                <div className="relative h-2 w-28 border border-ink" aria-hidden>
+                  <motion.span
+                    className="absolute inset-y-0 left-0 bg-brand"
+                    initial={false}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+                  />
+                </div>
+              </div>
+            )
+          }
         />
 
-        <label className="flex h-9 items-center gap-2 rounded-sm border border-border bg-card px-3 text-sm text-foreground">
-          <input
-            type="checkbox"
-            checked={newRecurring}
-            onChange={(e) => setNewRecurring(e.target.checked)}
-          />
-          Recorrente
-        </label>
-
-        <select
-          className="arch-picker h-9"
-          value={newRecurrenceFrequency}
-          onChange={(e) => setNewRecurrenceFrequency(e.target.value as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY")}
-          disabled={!newRecurring}
-        >
-          <option value="DAILY">Diária</option>
-          <option value="WEEKLY">Semanal</option>
-          <option value="MONTHLY">Mensal</option>
-          <option value="YEARLY">Anual</option>
-        </select>
-      </div>
-
-      {/* ═══ Separador ornamental ═══ */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 h-px bg-linear-to-r from-transparent via-border to-transparent" />
-        <span className="text-[10px] font-heading tracking-[0.3em] text-relic uppercase">
-          Hierarquia
-        </span>
-        <div className="flex-1 h-px bg-linear-to-r from-transparent via-border to-transparent" />
-      </div>
-
-      {/* ═══ Conteúdo ═══ */}
-      {loading ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-arcane" />
-        </div>
-      ) : tasks.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground">
-          <div className="h-16 w-16 rounded-full border border-ash flex items-center justify-center">
-            <Plus className="h-6 w-6 text-relic" />
+        {/* ═══ Nova tarefa ═══ */}
+        <Panel title="Nova tarefa" className="mb-8">
+          <div className="flex items-stretch gap-2">
+            <Input
+              ref={inputRef}
+              type="text"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
+              placeholder="O que precisa ser feito?"
+              className="h-10 flex-1 text-base"
+              disabled={creating}
+            />
+            <Button
+              onClick={handleCreate}
+              disabled={creating || !newTitle.trim()}
+              variant="brand"
+              size="icon"
+              className="h-10 w-10"
+              aria-label="Criar tarefa"
+            >
+              {creating ? <Loader2 className="animate-spin" /> : <Plus />}
+            </Button>
           </div>
-          <p className="text-sm">Nenhuma tarefa encontrada.</p>
-          <p className="text-xs text-relic">Crie sua primeira tarefa acima</p>
-        </div>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          onDragCancel={handleDragCancel}
-        >
-          <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
-            <div className="
-              rounded-sm border border-border bg-card/50 p-3
-              shadow-[inset_0_1px_0_rgba(201,168,76,0.05)]
-              overflow-y-auto flex-1
-            ">
-              <TaskList tasks={tasks} callbacks={callbacks} />
-            </div>
-          </SortableContext>
 
-          <DragOverlay>
-            {activeTask ? (
-              <div className="rounded-sm bg-card border border-arcane/30 px-4 py-2 shadow-lg shadow-arcane/10">
-                <span className="text-sm font-medium text-foreground">{activeTask.title}</span>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <Input
+              type="date"
+              value={newDueDate}
+              onChange={(e) => setNewDueDate(e.target.value)}
+              className="h-9 font-mono text-xs"
+              aria-label="Data de vencimento"
+            />
+
+            <label className="flex h-9 cursor-pointer items-center gap-2.5 border border-line bg-card px-3 text-sm transition-colors hover:border-ink/50">
+              <input
+                type="checkbox"
+                checked={newRecurring}
+                onChange={(e) => setNewRecurring(e.target.checked)}
+                className="size-3.5 accent-[var(--brand)]"
+              />
+              Recorrente
+            </label>
+
+            <select
+              className="arch-picker h-9 disabled:opacity-50"
+              value={newRecurrenceFrequency}
+              onChange={(e) => setNewRecurrenceFrequency(e.target.value as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY")}
+              disabled={!newRecurring}
+              aria-label="Frequência"
+            >
+              <option value="DAILY">Diária</option>
+              <option value="WEEKLY">Semanal</option>
+              <option value="MONTHLY">Mensal</option>
+              <option value="YEARLY">Anual</option>
+            </select>
+          </div>
+        </Panel>
+
+        <Divider label="Hierarquia" className="mb-4" />
+
+        {/* ═══ Conteúdo ═══ */}
+        {loading ? (
+          <div className="grid gap-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-10" style={{ marginLeft: `${(i % 3) * 1.5}rem` }} />
+            ))}
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="hatch flex flex-1 flex-col items-center justify-center gap-3 border border-dashed border-line px-6 py-16 text-center">
+            <div className="grid size-12 place-items-center border border-ink bg-card">
+              <Plus className="h-5 w-5" />
+            </div>
+            <p className="font-heading text-xl font-bold">Nenhuma tarefa encontrada</p>
+            <p className="text-sm text-muted-foreground">Crie sua primeira tarefa acima.</p>
+          </div>
+        ) : (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
+            <SortableContext items={flatIds} strategy={verticalListSortingStrategy}>
+              <div className="border border-ink bg-card py-1">
+                <TaskList tasks={tasks} callbacks={callbacks} />
               </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      )}
+            </SortableContext>
+
+            <DragOverlay>
+              {activeTask ? (
+                <div className="border border-ink border-l-[3px] border-l-brand bg-card px-4 py-2 shadow-[4px_4px_0_0_var(--ink)]">
+                  <span className="text-sm font-medium text-foreground">{activeTask.title}</span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        )}
+      </div>
     </div>
   );
 }

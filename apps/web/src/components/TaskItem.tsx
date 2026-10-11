@@ -7,10 +7,12 @@ import {
   Shield,
   Zap,
   CircleDot,
-  CheckCircle2,
+  Check,
   GripVertical,
 } from "lucide-react";
 import { useState } from "react";
+import { motion } from "motion/react";
+import { cn } from "@/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
@@ -69,27 +71,11 @@ export function buildLevelMap(tasks: Task[], level = 0): Map<string, number> {
   return map;
 }
 
-const priorityConfig: Record<string, { icon: typeof Flame; color: string; glow: string }> = {
-  urgent: {
-    icon: Flame,
-    color: "text-ember",
-    glow: "drop-shadow-[0_0_4px_rgba(212,102,58,0.5)]",
-  },
-  high: {
-    icon: Zap,
-    color: "text-arcane-glow",
-    glow: "drop-shadow-[0_0_4px_rgba(230,198,90,0.4)]",
-  },
-  medium: {
-    icon: Shield,
-    color: "text-arcane",
-    glow: "",
-  },
-  low: {
-    icon: CircleDot,
-    color: "text-relic",
-    glow: "",
-  },
+const priorityConfig: Record<string, { icon: typeof Flame; color: string; label: string }> = {
+  urgent: { icon: Flame, color: "text-destructive", label: "Urgente" },
+  high: { icon: Zap, color: "text-signal", label: "Alta" },
+  medium: { icon: Shield, color: "text-brand", label: "Média" },
+  low: { icon: CircleDot, color: "text-muted-foreground", label: "Baixa" },
 };
 
 export function TaskItem({
@@ -123,24 +109,21 @@ export function TaskItem({
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative ${isDragging ? "z-50 opacity-70" : ""}`}
+      className={cn("relative", isDragging && "z-50 opacity-40")}
     >
       {/* Linha de conexão vertical para sub-tarefas */}
       {level > 0 && !isDragging && (
         <div
-          className="absolute top-0 bottom-0 w-px bg-linear-to-b from-arcane/30 to-transparent"
+          className="absolute top-0 bottom-0 w-px bg-line"
           style={{ left: `${(level - 1) * 1.5 + 0.75}rem` }}
         />
       )}
 
       <div
-        className={`
-          group relative flex items-center gap-2.5 rounded-sm px-3 py-2
-          transition-all duration-200
-          hover:bg-muted/60
-          ${isCompleted ? "opacity-60" : ""}
-          ${isDragging ? "bg-card shadow-lg shadow-arcane/10 ring-1 ring-arcane/30" : ""}
-        `}
+        className={cn(
+          "group relative flex items-center gap-2.5 px-3 py-2 transition-colors duration-150 hover:bg-surface-2/70 focus-visible:bg-surface-2/70 focus-visible:outline-none",
+          isCompleted && "opacity-60",
+        )}
         style={{ paddingLeft: `${level * 1.5 + 0.5}rem` }}
         tabIndex={0}
         onKeyDown={(e) => {
@@ -156,7 +139,7 @@ export function TaskItem({
       >
         {/* Drag handle */}
         <button
-          className="flex h-5 w-5 shrink-0 cursor-grab items-center justify-center text-relic/50 hover:text-arcane active:cursor-grabbing transition-colors"
+          className="flex h-5 w-5 shrink-0 cursor-grab items-center justify-center text-muted-foreground/40 opacity-0 transition-[opacity,color] hover:text-foreground group-hover:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
           {...attributes}
           {...listeners}
           aria-label="Arrastar para reordenar"
@@ -166,15 +149,15 @@ export function TaskItem({
 
         {/* Chevron expandir/colapsar */}
         <button
-          className="flex h-5 w-5 shrink-0 items-center justify-center text-relic hover:text-arcane transition-colors"
+          className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           onClick={() => hasChildren && setExpanded((prev) => !prev)}
           aria-label={expanded ? "Recolher" : "Expandir"}
         >
           {hasChildren ? (
             expanded ? (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3.5 w-3.5" />
             ) : (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-3.5 w-3.5" />
             )
           ) : (
             <span className="h-4 w-4" />
@@ -183,42 +166,59 @@ export function TaskItem({
 
         {/* Ícone de prioridade / status — clicável para toggle complete */}
         <button
-          className="shrink-0 transition-transform hover:scale-110"
+          className={cn(
+            "group/check grid size-5 shrink-0 place-items-center border transition-colors",
+            isCompleted ? "border-success bg-success text-surface-1" : "border-line hover:border-ink",
+          )}
           onClick={() => callbacks.onToggleComplete(task.id)}
           aria-label={isCompleted ? "Reabrir tarefa" : "Concluir tarefa"}
-          title={isCompleted ? "Reabrir" : "Concluir"}
+          title={isCompleted ? "Reabrir" : `Concluir · prioridade ${priority.label.toLowerCase()}`}
         >
           {isCompleted ? (
-            <CheckCircle2 className="h-4 w-4 text-toxic drop-shadow-[0_0_4px_rgba(123,201,106,0.5)]" />
+            <motion.span initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 25 }}>
+              <Check className="h-3.5 w-3.5" strokeWidth={3} />
+            </motion.span>
           ) : (
-            <PriorityIcon className={`h-4 w-4 ${priority.color} ${priority.glow}`} />
+            <PriorityIcon className={cn("h-3 w-3", priority.color)} />
           )}
         </button>
 
         {/* Linha decorativa horizontal */}
         {level > 0 && !isDragging && (
-          <div className="absolute top-1/2 h-px w-3 bg-arcane/20"
+          <div className="absolute top-1/2 h-px w-3 bg-line"
             style={{ left: `${(level - 1) * 1.5 + 0.75}rem` }}
           />
         )}
 
         {/* Título */}
         <span
-          className={`flex-1 text-sm font-medium truncate transition-colors ${
-            isCompleted
-              ? "text-muted-foreground line-through decoration-relic/50"
-              : "text-foreground"
-          }`}
+          className={cn(
+            "relative min-w-0 flex-1 truncate text-sm transition-colors",
+            isCompleted ? "text-muted-foreground" : "text-foreground",
+          )}
         >
           {task.title}
+          <motion.span
+            aria-hidden
+            className="absolute left-0 top-1/2 h-px w-full origin-left bg-current"
+            initial={false}
+            animate={{ scaleX: isCompleted ? 1 : 0 }}
+            transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          />
         </span>
+
+        {task.dueDate && (
+          <span className="label-tech hidden shrink-0 tabular-nums text-muted-foreground sm:inline">
+            {new Date(task.dueDate).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" })}
+          </span>
+        )}
 
         {/* Botões Indent / Outdent */}
         {(canOutdent || canIndent) && (
-          <div className="flex shrink-0 items-center gap-0.5 border border-border/50 rounded-sm overflow-hidden">
+          <div className="flex shrink-0 items-center overflow-hidden border border-line opacity-0 transition-opacity group-hover:opacity-100 [@media(hover:none)]:opacity-100 group-focus-within:opacity-100">
             {canOutdent && (
               <button
-                className="flex items-center gap-1 px-1.5 py-0.5 text-relic hover:text-arcane-glow hover:bg-ash/50 transition-colors text-[11px]"
+                className="flex items-center px-1.5 py-1 text-muted-foreground transition-colors hover:bg-ink hover:text-surface-1"
                 onClick={() => callbacks.onOutdent(task.id)}
                 title="Promover (Shift+Tab)"
                 aria-label="Promover tarefa"
@@ -228,7 +228,7 @@ export function TaskItem({
             )}
             {canIndent && (
               <button
-                className="flex items-center gap-1 px-1.5 py-0.5 text-relic hover:text-arcane-glow hover:bg-ash/50 transition-colors text-[11px]"
+                className="flex items-center px-1.5 py-1 text-muted-foreground transition-colors hover:bg-ink hover:text-surface-1"
                 onClick={() => callbacks.onIndent(task.id)}
                 title="Rebaixar (Tab)"
                 aria-label="Rebaixar tarefa"

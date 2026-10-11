@@ -16,6 +16,9 @@ import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
 import { api } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
+import { Divider } from "@/components/ui/divider"
+import { AnimatePresence, motion } from "motion/react"
+import { ArrowRight, Loader2 } from "lucide-react"
 
 
 const authSchema = z.object({
@@ -117,13 +120,16 @@ export function LoginForm() {
   return (
     <div className="grid gap-6">
         
-        {/* Cabeçalho dinâmico opcional para melhorar a UI */}
-        <div className="flex flex-col space-y-2 text-center mb-2">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isRegistering ? "Criar nova conta" : "Bem-vindo de volta!"}
+        <div className="flex flex-col gap-2">
+          <p className="label-tech flex items-center gap-2 text-muted-foreground">
+            <span className="size-1.5 bg-brand" />
+            {isRegistering ? "Nova conta" : "Acesso"}
+          </p>
+          <h1 className="font-heading text-3xl font-bold tracking-tight">
+            {isRegistering ? "Criar nova conta" : "Bem-vindo de volta"}
           </h1>
-          <p className="text-sm text-slate-400">
-            {isRegistering ? "Preencha seus dados abaixo para começar" : "Digite seu email e senha para continuar"}
+          <p className="text-sm text-muted-foreground">
+            {isRegistering ? "Preencha seus dados abaixo para começar." : "Digite seu email e senha para continuar."}
           </p>
         </div>
 
@@ -131,7 +137,15 @@ export function LoginForm() {
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             
             {/* Renderização Condicional: Só exibe o Input de Nome no Registro */}
+            <AnimatePresence initial={false}>
             {isRegistering && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                className="overflow-hidden"
+              >
               <FormField
                 control={form.control}
                 name="name"
@@ -141,11 +155,13 @@ export function LoginForm() {
                     <FormControl>
                       <Input placeholder="Seu nome completo" {...field} />
                     </FormControl>
-                    <FormMessage className="text-red-500" />
+                    <FormMessage />
                   </FormItem>
                 )}
               />
+              </motion.div>
             )}
+            </AnimatePresence>
 
             <FormField
               control={form.control}
@@ -156,7 +172,7 @@ export function LoginForm() {
                   <FormControl>
                     <Input placeholder="exemplo@exemplo.com" {...field} />
                   </FormControl>
-                  <FormMessage className="text-red-500" />
+                  <FormMessage />
                 </FormItem>
               )}
             />
@@ -170,26 +186,24 @@ export function LoginForm() {
                   <FormControl>
                     <Input type="password" {...field} />
                   </FormControl>
-                  <FormMessage className="text-red-500" />
+                  <FormMessage />
                 </FormItem>
               )}
             />
             
-            <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white" disabled={isLoading}>
-              {isLoading ? "Carregando..." : (isRegistering ? "Criar Conta" : "Entrar")}
+            <Button type="submit" variant="brand" size="lg" className="group mt-2 w-full justify-between" disabled={isLoading}>
+              {isLoading ? "Carregando..." : (isRegistering ? "Criar conta" : "Entrar")}
+              {isLoading ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <ArrowRight className="transition-transform group-hover:translate-x-1" />
+              )}
             </Button>
           </form>
         </Form>
 
         {googleEnabled && (
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-border" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">ou</span>
-            </div>
-          </div>
+          <Divider label="ou" />
         )}
 
         {googleEnabled && (
@@ -207,7 +221,7 @@ export function LoginForm() {
               }}
               useOneTap={false}
               text={isRegistering ? "signup_with" : "signin_with"}
-              shape="pill"
+              shape="rectangular"
               width="320"
             />
           </div>
@@ -218,12 +232,12 @@ export function LoginForm() {
         )}
 
         {/* Botão para alternar entre Login e Cadastro */}
-        <div className="text-center text-sm text-slate-400">
+        <div className="border-t border-line pt-5 text-center text-sm text-muted-foreground">
           {isRegistering ? "Já tem uma conta? " : "Não tem uma conta? "}
           <button
             type="button"
             onClick={toggleMode}
-            className="text-blue-400 hover:text-blue-300 hover:underline font-medium transition-colors"
+            className="font-medium text-brand underline-offset-4 hover:underline"
           >
             {isRegistering ? "Faça login" : "Cadastre-se"}
           </button>

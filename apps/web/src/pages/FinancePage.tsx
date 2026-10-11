@@ -14,7 +14,12 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 
+import { motion } from "motion/react"
 import { api } from "@/lib/api"
+import { Panel } from "@/components/ui/panel"
+import { PageHeader } from "@/components/ui/page-header"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Stat } from "@/components/ui/stat"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {
@@ -41,6 +46,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="hatch border border-dashed border-line px-4 py-8 text-center">
+      <span className="label-tech text-muted-foreground">{children}</span>
+    </div>
+  )
+}
+
+function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name?: string; value?: number | string; payload?: { color?: string } }> }) {
+  if (!active || !payload?.length) return null
+  const item = payload[0]
+  const numeric = typeof item.value === "number" ? item.value : Number(item.value ?? 0)
+  return (
+    <div className="border border-ink bg-popover px-3 py-2 shadow-[3px_3px_0_0_var(--ink)]">
+      <p className="label-tech flex items-center gap-2 text-muted-foreground">
+        <span className="size-2" style={{ backgroundColor: item.payload?.color }} />
+        {item.name}
+      </p>
+      <p className="mt-1 font-mono text-sm tabular-nums text-foreground">
+        {currencyFormatter.format(Number.isFinite(numeric) ? numeric : 0)}
+      </p>
+    </div>
+  )
+}
 
 type TransactionType = "INCOME" | "EXPENSE"
 type RecurrenceFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY"
@@ -410,7 +440,7 @@ export function FinancePage() {
         header: ({ column }) => (
           <Button
             variant="ghost"
-            className="h-8 px-2"
+            className="-ml-2 h-7 px-2 font-mono text-[0.6875rem] uppercase tracking-[0.08em]"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
           >
             Data
@@ -423,7 +453,7 @@ export function FinancePage() {
         ),
         cell: ({ row }) => {
           const raw = row.getValue("occurredAt") as string
-          return <span>{dateFormatter.format(new Date(raw))}</span>
+          return <span className="font-mono text-xs tabular-nums text-muted-foreground">{dateFormatter.format(new Date(raw))}</span>
         },
       },
       {
@@ -437,7 +467,7 @@ export function FinancePage() {
         accessorKey: "category",
         header: "Categoria",
         cell: ({ row }) => (
-          <span className="text-relic">{row.getValue("category") as string}</span>
+          <span className="border border-line px-1.5 py-0.5 font-mono text-[0.6875rem] text-muted-foreground">{row.getValue("category") as string}</span>
         ),
       },
       {
@@ -449,7 +479,7 @@ export function FinancePage() {
           const isIncome = type === "INCOME"
 
           return (
-            <span className={isIncome ? "text-toxic font-semibold" : "text-ember font-semibold"}>
+            <span className={`font-mono tabular-nums ${isIncome ? "text-success" : "text-foreground"}`}>
               {isIncome ? "+ " : "- "}
               {currencyFormatter.format(amount)}
             </span>
@@ -461,11 +491,11 @@ export function FinancePage() {
         header: "Ações",
         enableSorting: false,
         cell: ({ row }) => (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-relic hover:text-toxic"
+              className="h-8 w-8"
               onClick={() => openEditModal(row.original)}
               title="Editar transação"
             >
@@ -474,7 +504,7 @@ export function FinancePage() {
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-relic hover:text-ember"
+              className="h-8 w-8 hover:text-destructive"
               onClick={() => openDeleteModal(row.original)}
               title="Excluir transação"
             >
@@ -527,8 +557,8 @@ export function FinancePage() {
   function getAccountVisualState(entry: AccountEntry) {
     if (entry.status === 'PAID') {
       return {
-        cardClass: 'border-toxic/40 bg-toxic/8',
-        badgeClass: 'bg-toxic/15 text-toxic border-toxic/40',
+        cardClass: 'border-l-success',
+        badgeClass: 'bg-success text-surface-1',
         label: 'Pago',
       }
     }
@@ -543,53 +573,50 @@ export function FinancePage() {
 
     if (entry.status === 'OVERDUE' || dayDiff < 0) {
       return {
-        cardClass: 'border-ember/50 bg-ember/8',
-        badgeClass: 'bg-ember/15 text-ember border-ember/40',
+        cardClass: 'border-l-destructive bg-destructive/5',
+        badgeClass: 'bg-destructive text-destructive-foreground',
         label: 'Atrasado',
       }
     }
 
     if (dayDiff <= 7) {
       return {
-        cardClass: 'border-arcane/50 bg-arcane/8',
-        badgeClass: 'bg-arcane/15 text-arcane border-arcane/40',
+        cardClass: 'border-l-signal',
+        badgeClass: 'bg-signal text-signal-foreground',
         label: 'Vence em breve',
       }
     }
 
     return {
-      cardClass: 'border-border/50 bg-background/20',
-      badgeClass: 'bg-background/70 text-relic border-border/60',
+      cardClass: 'border-l-line',
+      badgeClass: 'bg-surface-2 text-muted-foreground',
       label: 'Pendente',
     }
   }
 
   return (
-    <div className="mx-auto flex h-full w-full max-w-350 flex-col gap-4 p-6">
-      <div className="flex items-center gap-3">
-        <div className="h-8 w-1 rounded-full bg-linear-to-b from-arcane to-arcane/20" />
-        <h1 className="font-heading text-2xl font-bold tracking-wider text-foreground">Finanças</h1>
-        <Button className="ml-auto" onClick={openCreateModal}>
-          <Plus className="h-4 w-4" />
-          Nova transação
-        </Button>
-      </div>
+    <div className="h-full overflow-y-auto">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-6 px-5 py-8 md:px-10 md:py-12">
+      <PageHeader
+        eyebrow="05 / Finanças"
+        title="Finanças"
+        description="Livro-caixa, projeções, metas e contas do mês."
+        className="mb-2"
+        actions={
+          <Button variant="brand" onClick={openCreateModal}>
+            <Plus />
+            Nova transação
+          </Button>
+        }
+      />
 
-      <div className="rounded-xl border border-border/60 bg-card/70 p-4 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.8)]">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-heading text-sm tracking-wider text-foreground">Despesas por categoria</h2>
-            <p className="text-xs text-relic">{chartMonthLabel || "Mês atual"}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-wide text-relic">Total gasto</p>
-            <p className="font-heading text-lg text-ember">{currencyFormatter.format(chartTotal)}</p>
-          </div>
-        </div>
-
+      <Panel
+        title="Despesas por categoria"
+        aside={<span className="label-tech">{chartMonthLabel || "Mês atual"}</span>}
+      >
         {expensesByCategory.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-[minmax(0,340px)_1fr] md:items-center">
-            <div className="h-70 w-full">
+          <div className="grid gap-6 md:grid-cols-[minmax(0,300px)_1fr] md:items-center">
+            <div className="relative h-70 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -598,68 +625,57 @@ export function FinancePage() {
                     nameKey="category"
                     cx="50%"
                     cy="50%"
-                    innerRadius={64}
-                    outerRadius={96}
-                    paddingAngle={2}
-                    stroke="transparent"
+                    innerRadius={78}
+                    outerRadius={108}
+                    paddingAngle={1.5}
+                    stroke="var(--card)"
+                    strokeWidth={2}
                   >
                     {expensesByCategory.map((entry) => (
                       <Cell key={entry.category} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    formatter={(value) => {
-                      const numericValue =
-                        typeof value === "number" ? value : Number(value ?? 0)
-                      return currencyFormatter.format(Number.isFinite(numericValue) ? numericValue : 0)
-                    }}
-                    contentStyle={{
-                      backgroundColor: "#0f172a",
-                      border: "1px solid #334155",
-                      borderRadius: "0.6rem",
-                      color: "#e2e8f0",
-                    }}
-                    itemStyle={{ color: "#e2e8f0" }}
-                    labelStyle={{ color: "#94a3b8" }}
-                  />
+                  <Tooltip content={<ChartTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
+              <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                <span className="label-tech text-muted-foreground">Total gasto</span>
+                <span className="mt-1 font-mono text-xl font-medium tabular-nums">{currencyFormatter.format(chartTotal)}</span>
+              </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="divide-y divide-line border-y border-line">
               {expensesByCategory.map((item) => {
                 const share = chartTotal > 0 ? (item.amount / chartTotal) * 100 : 0
 
                 return (
-                  <div
-                    key={item.category}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-border/50 bg-background/50 px-3 py-2"
-                  >
+                  <div key={item.category} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span
-                        className="h-3 w-3 rounded-full"
+                      <span className="size-2.5 shrink-0" style={{ backgroundColor: item.color }} aria-hidden />
+                      <span className="text-sm">{item.category}</span>
+                    </div>
+                    <p className="font-mono text-sm tabular-nums">{currencyFormatter.format(item.amount)}</p>
+                    <div className="h-1 bg-surface-2">
+                      <motion.div
+                        className="h-full"
                         style={{ backgroundColor: item.color }}
-                        aria-hidden
+                        initial={{ width: 0 }}
+                        animate={{ width: `${share}%` }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                       />
-                      <span className="text-sm text-foreground">{item.category}</span>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-semibold text-foreground">{currencyFormatter.format(item.amount)}</p>
-                      <p className="text-xs text-relic">{share.toFixed(1)}%</p>
-                    </div>
+                    <p className="label-tech text-right tabular-nums text-muted-foreground">{share.toFixed(1)}%</p>
                   </div>
                 )
               })}
             </div>
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-border/70 bg-background/40 px-4 py-7 text-center text-sm text-relic">
-            Sem despesas no período para montar o gráfico.
-          </div>
+          <EmptyState>Sem despesas no período para montar o gráfico.</EmptyState>
         )}
-      </div>
+      </Panel>
 
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-card/60 shadow-[0_18px_50px_-35px_rgba(0,0,0,0.8)]">
+      <Panel title="Transações" aside={<span className="label-tech tabular-nums">{transactions.length} registros</span>} flush>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -676,14 +692,16 @@ export function FinancePage() {
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-relic">
-                  Carregando transações...
-                </TableCell>
-              </TableRow>
+              Array.from({ length: 4 }).map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell colSpan={5}>
+                    <Skeleton className="h-6" />
+                  </TableCell>
+                </TableRow>
+              ))
             ) : table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="group">
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -693,64 +711,47 @@ export function FinancePage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-relic">
-                  Nenhuma transação cadastrada.
+                <TableCell colSpan={5} className="h-24 text-center">
+                  <span className="label-tech text-muted-foreground">Nenhuma transação cadastrada</span>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
-      </div>
+      </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
-          <h2 className="font-heading text-sm tracking-wider text-foreground">Projeção do mês</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
-              <p className="text-xs uppercase tracking-wide text-relic">Despesa atual</p>
-              <p className="mt-1 text-lg font-semibold text-ember">
-                {currencyFormatter.format(insights?.expense ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
-              <p className="text-xs uppercase tracking-wide text-relic">Despesa projetada</p>
-              <p className="mt-1 text-lg font-semibold text-arcane">
-                {currencyFormatter.format(insights?.projectedExpense ?? 0)}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background/40 p-3 sm:col-span-2">
-              <p className="text-xs uppercase tracking-wide text-relic">Saldo projetado</p>
-              <p className={`mt-1 text-xl font-semibold ${(insights?.projectedBalance ?? 0) >= 0 ? 'text-toxic' : 'text-ember'}`}>
-                {currencyFormatter.format(insights?.projectedBalance ?? 0)}
-              </p>
-              <p className="mt-1 text-xs text-relic">
-                Baseado em {insights?.elapsedDays ?? 0} de {insights?.daysInMonth ?? 0} dias do mês
-              </p>
-            </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Panel title="Projeção do mês">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Stat label="Despesa atual" value={currencyFormatter.format(insights?.expense ?? 0)} tone="signal" />
+            <Stat label="Despesa projetada" value={currencyFormatter.format(insights?.projectedExpense ?? 0)} tone="brand" />
+            <Stat
+              className="sm:col-span-2"
+              label="Saldo projetado"
+              value={currencyFormatter.format(insights?.projectedBalance ?? 0)}
+              tone={(insights?.projectedBalance ?? 0) >= 0 ? "success" : "danger"}
+              hint={`Baseado em ${insights?.elapsedDays ?? 0} de ${insights?.daysInMonth ?? 0} dias do mês`}
+            />
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
-          <h2 className="font-heading text-sm tracking-wider text-foreground">Alertas financeiros</h2>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
-              <p className="text-xs uppercase tracking-wide text-relic">Contas atrasadas</p>
-              <p className={`mt-1 text-2xl font-semibold ${(insights?.overdueCount ?? 0) > 0 ? 'text-ember' : 'text-toxic'}`}>
-                {insights?.overdueCount ?? 0}
-              </p>
-            </div>
-            <div className="rounded-lg border border-border/50 bg-background/40 p-3">
-              <p className="text-xs uppercase tracking-wide text-relic">Vencendo em 7 dias</p>
-              <p className={`mt-1 text-2xl font-semibold ${(insights?.dueSoonCount ?? 0) > 0 ? 'text-arcane' : 'text-toxic'}`}>
-                {insights?.dueSoonCount ?? 0}
-              </p>
-            </div>
+        <Panel title="Alertas financeiros">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Stat
+              label="Contas atrasadas"
+              value={insights?.overdueCount ?? 0}
+              tone={(insights?.overdueCount ?? 0) > 0 ? "danger" : "success"}
+            />
+            <Stat
+              label="Vencendo em 7 dias"
+              value={insights?.dueSoonCount ?? 0}
+              tone={(insights?.dueSoonCount ?? 0) > 0 ? "signal" : "success"}
+            />
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
-          <h2 className="font-heading text-sm tracking-wider text-foreground">Metas financeiras mensais</h2>
-          <div className="mt-3 grid gap-2 sm:grid-cols-[1fr_140px_auto]">
+        <Panel title="Metas mensais">
+          <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
             <Input
               placeholder="Categoria da meta"
               value={goalCategory}
@@ -763,30 +764,37 @@ export function FinancePage() {
               placeholder="Valor da meta"
               value={goalAmount}
               onChange={(e) => setGoalAmount(e.target.value)}
+              className="font-mono"
             />
             <Button onClick={handleSaveGoal} disabled={savingGoal}>Salvar</Button>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-4 space-y-3">
             {goals.length === 0 ? (
-              <p className="text-sm text-relic">Nenhuma meta cadastrada para este mês.</p>
+              <EmptyState>Nenhuma meta cadastrada para este mês.</EmptyState>
             ) : (
               goals.map((goal) => {
                 const spent = spentByCategory[goal.category] ?? 0
                 const progress = goal.targetAmount > 0 ? Math.min((spent / goal.targetAmount) * 100, 100) : 0
+                const barTone = progress >= 100 ? "bg-destructive" : progress >= 80 ? "bg-signal" : "bg-success"
                 return (
-                  <div key={goal.id} className="rounded-lg border border-border/50 p-3">
+                  <div key={goal.id} className="group border border-line p-3 transition-colors hover:border-ink">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-foreground">{goal.category}</p>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteGoal(goal.id)}>Remover</Button>
+                      <p className="font-medium">{goal.category}</p>
+                      <Button variant="ghost" size="sm" className="h-7" onClick={() => handleDeleteGoal(goal.id)}>Remover</Button>
                     </div>
-                    <p className="text-xs text-relic">
-                      {currencyFormatter.format(spent)} de {currencyFormatter.format(goal.targetAmount)}
-                    </p>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-background/70">
-                      <div
-                        className={`h-full ${progress >= 100 ? 'bg-ember' : progress >= 80 ? 'bg-arcane' : 'bg-toxic'}`}
-                        style={{ width: `${progress}%` }}
+                    <div className="mt-1 flex items-baseline justify-between gap-2">
+                      <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                        {currencyFormatter.format(spent)} / {currencyFormatter.format(goal.targetAmount)}
+                      </p>
+                      <p className="label-tech tabular-nums">{Math.round(progress)}%</p>
+                    </div>
+                    <div className="hatch mt-2 h-2.5 border border-line">
+                      <motion.div
+                        className={`h-full ${barTone}`}
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
                       />
                     </div>
                   </div>
@@ -794,58 +802,59 @@ export function FinancePage() {
               })
             )}
           </div>
-        </section>
+        </Panel>
 
-        <section className="rounded-xl border border-border/60 bg-card/70 p-4">
-          <h2 className="font-heading text-sm tracking-wider text-foreground">Contas a pagar e receber</h2>
-
-          <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            <select className="arch-picker" value={accountType} onChange={(e) => setAccountType(e.target.value as 'PAYABLE' | 'RECEIVABLE')}>
+        <Panel title="Contas a pagar e receber">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <select className="arch-picker" value={accountType} onChange={(e) => setAccountType(e.target.value as 'PAYABLE' | 'RECEIVABLE')} aria-label="Tipo de lançamento">
               <option value="PAYABLE">A pagar</option>
               <option value="RECEIVABLE">A receber</option>
             </select>
             <Input placeholder="Categoria" value={accountCategory} onChange={(e) => setAccountCategory(e.target.value)} />
             <Input placeholder="Descrição" value={accountDescription} onChange={(e) => setAccountDescription(e.target.value)} />
-            <Input type="number" step="0.01" min="0" placeholder="Valor" value={accountAmount} onChange={(e) => setAccountAmount(e.target.value)} />
-            <Input type="date" value={accountDueDate} onChange={(e) => setAccountDueDate(e.target.value)} />
+            <Input type="number" step="0.01" min="0" placeholder="Valor" value={accountAmount} onChange={(e) => setAccountAmount(e.target.value)} className="font-mono" />
+            <Input type="date" value={accountDueDate} onChange={(e) => setAccountDueDate(e.target.value)} className="font-mono text-xs" aria-label="Vencimento" />
             <Button onClick={handleSaveAccount} disabled={savingAccount}>Salvar lançamento</Button>
           </div>
 
-          <div className="mt-3 space-y-2">
+          <div className="mt-4 space-y-2">
             {accounts.length === 0 ? (
-              <p className="text-sm text-relic">Nenhum lançamento no mês atual.</p>
+              <EmptyState>Nenhum lançamento no mês atual.</EmptyState>
             ) : (
               accounts.map((entry) => {
                 const visual = getAccountVisualState(entry)
 
                 return (
-                  <div key={entry.id} className={`rounded-lg border p-3 ${visual.cardClass}`}>
+                  <div key={entry.id} className={`border border-line border-l-[3px] p-3 transition-colors hover:border-ink ${visual.cardClass}`}>
                     <div className="flex items-center justify-between gap-2">
-                      <p className="font-medium text-foreground">
-                        {entry.type === 'PAYABLE' ? 'Pagar' : 'Receber'} - {entry.category}
+                      <p className="font-medium">
+                        <span className="label-tech mr-2 text-muted-foreground">{entry.type === 'PAYABLE' ? 'Pagar' : 'Receber'}</span>
+                        {entry.category}
                       </p>
-                      <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${visual.badgeClass}`}>
-                        {visual.label}
-                      </span>
+                      <span className={`chip ${visual.badgeClass}`}>{visual.label}</span>
                     </div>
-                    <p className="text-xs text-relic">Vencimento: {dateFormatter.format(new Date(entry.dueDate))}</p>
-                    <p className="text-sm font-semibold text-foreground">{currencyFormatter.format(entry.amount)}</p>
-                    <div className="mt-2 flex gap-2">
-                      {entry.status !== 'PAID' ? (
-                        <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
-                          Marcar pago
+                    <div className="mt-2 flex items-end justify-between gap-2">
+                      <div>
+                        <p className="font-mono text-lg tabular-nums">{currencyFormatter.format(entry.amount)}</p>
+                        <p className="label-tech text-muted-foreground">Vence {dateFormatter.format(new Date(entry.dueDate))}</p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {entry.status !== 'PAID' ? (
+                          <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
+                            Marcar pago
+                          </Button>
+                        ) : null}
+                        <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>
+                          Remover
                         </Button>
-                      ) : null}
-                      <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>
-                        Remover
-                      </Button>
+                      </div>
                     </div>
                   </div>
                 )
               })
             )}
           </div>
-        </section>
+        </Panel>
       </div>
 
       <Dialog
@@ -858,9 +867,9 @@ export function FinancePage() {
           }
         }}
       >
-        <DialogContent className="border-border bg-card/95 text-foreground backdrop-blur">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="font-heading tracking-wide">
+            <DialogTitle>
               {transactionToEdit ? "Editar transação" : "Nova transação"}
             </DialogTitle>
             <DialogDescription>
@@ -964,7 +973,7 @@ export function FinancePage() {
                     <FormItem>
                       <FormLabel>Recorrência</FormLabel>
                       <FormControl>
-                        <label className="flex h-10 items-center gap-2 rounded-md border border-input bg-transparent px-3 text-sm">
+                        <label className="flex h-10 cursor-pointer items-center gap-2.5 border border-input bg-card px-3 text-sm">
                           <input
                             type="checkbox"
                             checked={field.value}
@@ -1041,7 +1050,7 @@ export function FinancePage() {
                 >
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={saving}>
+                <Button type="submit" variant="brand" disabled={saving}>
                   {saving ? "Salvando..." : transactionToEdit ? "Salvar alterações" : "Salvar"}
                 </Button>
               </DialogFooter>
@@ -1058,9 +1067,9 @@ export function FinancePage() {
           }
         }}
       >
-        <DialogContent className="border-border bg-card/95 text-foreground backdrop-blur sm:max-w-md">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-heading tracking-wide">Excluir transação</DialogTitle>
+            <DialogTitle>Excluir transação</DialogTitle>
             <DialogDescription>
               {transactionToDelete
                 ? `Tem certeza que deseja excluir a transação de ${currencyFormatter.format(transactionToDelete.amount)} da categoria ${transactionToDelete.category}?`
@@ -1088,6 +1097,7 @@ export function FinancePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   )
 }

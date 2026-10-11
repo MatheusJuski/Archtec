@@ -1,4 +1,5 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { useEditor, EditorContent, FloatingMenu, BubbleMenu } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -12,9 +13,28 @@ import { SlashCommand } from './extensions/SlashCommand'
 import { NoteMention } from './extensions/NoteMention'
 import {
   Heading1, Heading2, List, Bold, Italic, Strikethrough, Code,
-  Underline as UnderlineIcon, Highlighter, Link as LinkIcon
+  Underline as UnderlineIcon, Highlighter, Link as LinkIcon, Check, Unlink
 } from 'lucide-react'
 
+
+function MenuButton({ active, onClick, label, children }: { active?: boolean; onClick: () => void; label: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={cn(
+        "grid h-8 w-8 place-items-center transition-colors",
+        active ? "bg-ink text-surface-1" : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+const menuClass = "flex items-center gap-0.5 border border-ink bg-popover p-1 shadow-[3px_3px_0_0_var(--ink)]"
 
 interface EditorProps {
   content?: string;
@@ -48,7 +68,7 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
     editable,
     editorProps: {
       attributes: {
-        class: "editor-content focus:outline-none min-h-[150px]",
+        class: "editor-content focus:outline-none min-h-[240px]",
       },
     },
     onUpdate: ({ editor }) => {
@@ -62,90 +82,84 @@ export function Editor({ content = "", onChange, editable = true }: EditorProps)
     }
   }, [content, editor]);
 
-  const setLink = useCallback(() => {
-    if (!editor) return;
-    const previousUrl = editor.getAttributes('link').href;
-    const url = window.prompt('URL do link:', previousUrl);
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState("");
 
-    if (url === null) return; // cancelou
+  const openLinkEditor = useCallback(() => {
+    if (!editor) return;
+    setLinkUrl(editor.getAttributes('link').href ?? "");
+    setLinkOpen(true);
+  }, [editor]);
+
+  const applyLink = useCallback((e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!editor) return;
+    const url = linkUrl.trim();
     if (url === '') {
       editor.chain().focus().extendMarkRange('link').unsetLink().run();
-      return;
+    } else {
+      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
     }
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
+    setLinkOpen(false);
+  }, [editor, linkUrl]);
+
+  const removeLink = useCallback(() => {
+    editor?.chain().focus().extendMarkRange('link').unsetLink().run();
+    setLinkOpen(false);
   }, [editor]);
 
   if (!editor) return null
 
   return (
-    <div className="relative group min-h-75 px-6 py-6 bg-white/2 rounded-xl transition-all duration-300 border border-white/5 focus-within:bg-white/4 focus-within:border-white/10 focus-within:shadow-2xl">
+    <div className="relative min-h-75">
       {/* Bubble Menu (Formatação ao selecionar texto) */}
-      {editor && (
-        <BubbleMenu
-          editor={editor}
-          tippyOptions={{ duration: 100 }}
-          className="flex items-center gap-0.5 bg-[#12122b]/90 backdrop-blur-md border border-white/10 p-1 rounded-lg shadow-2xl"
-        >
-          {/* Grupo: Texto */}
-          <button onClick={() => editor.chain().focus().toggleBold().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('bold') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <Bold size={16} />
-          </button>
-          <button onClick={() => editor.chain().focus().toggleItalic().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('italic') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <Italic size={16} />
-          </button>
-          <button onClick={() => editor.chain().focus().toggleUnderline().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('underline') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <UnderlineIcon size={16} />
-          </button>
-          <button onClick={() => editor.chain().focus().toggleStrike().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('strike') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <Strikethrough size={16} />
-          </button>
+      <BubbleMenu
+        editor={editor}
+        tippyOptions={{ duration: 120, onHidden: () => setLinkOpen(false) }}
+        className={menuClass}
+      >
+        {linkOpen ? (
+          <form onSubmit={applyLink} className="flex items-center gap-1">
+            <LinkIcon size={14} className="mx-1.5 text-muted-foreground" />
+            <input
+              autoFocus
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') setLinkOpen(false) }}
+              placeholder="https://"
+              className="h-8 w-56 bg-transparent font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground"
+            />
+            <MenuButton onClick={() => applyLink()} label="Aplicar link"><Check size={15} /></MenuButton>
+            {editor.isActive('link') && (
+              <MenuButton onClick={removeLink} label="Remover link"><Unlink size={15} /></MenuButton>
+            )}
+          </form>
+        ) : (
+          <>
+            <MenuButton active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} label="Negrito"><Bold size={15} /></MenuButton>
+            <MenuButton active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} label="Itálico"><Italic size={15} /></MenuButton>
+            <MenuButton active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} label="Sublinhado"><UnderlineIcon size={15} /></MenuButton>
+            <MenuButton active={editor.isActive('strike')} onClick={() => editor.chain().focus().toggleStrike().run()} label="Tachado"><Strikethrough size={15} /></MenuButton>
 
-          {/* Separador */}
-          <div className="w-px h-5 bg-white/10 mx-1" />
+            <div className="mx-1 h-5 w-px bg-line" />
 
-          {/* Grupo: Semântico */}
-          <button onClick={() => editor.chain().focus().toggleCode().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('code') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <Code size={16} />
-          </button>
-          <button onClick={() => editor.chain().focus().toggleHighlight().run()} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('highlight') ? 'text-yellow-400' : 'text-slate-400'}`}>
-            <Highlighter size={16} />
-          </button>
-          <button onClick={setLink} type="button" className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('link') ? 'text-blue-400' : 'text-slate-400'}`}>
-            <LinkIcon size={16} />
-          </button>
-        </BubbleMenu>
-      )}
+            <MenuButton active={editor.isActive('code')} onClick={() => editor.chain().focus().toggleCode().run()} label="Código"><Code size={15} /></MenuButton>
+            <MenuButton active={editor.isActive('highlight')} onClick={() => editor.chain().focus().toggleHighlight().run()} label="Destacar"><Highlighter size={15} /></MenuButton>
+            <MenuButton active={editor.isActive('link')} onClick={openLinkEditor} label="Link"><LinkIcon size={15} /></MenuButton>
+          </>
+        )}
+      </BubbleMenu>
 
       {/* Floating Menu (Comandos rápidos em linha vazia) */}
-      {editor && (
-        <FloatingMenu
-          editor={editor}
-          tippyOptions={{ duration: 100 }}
-          className="flex gap-1 bg-[#12122b]/90 backdrop-blur-md border border-white/10 p-1.5 rounded-lg shadow-2xl ml-11.25"
-        >
-          <button
-            onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-            type="button"
-            className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('heading', { level: 1 }) ? 'text-blue-400' : 'text-slate-400'}`}
-          >
-            <Heading1 size={18} />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-            type="button"
-            className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('heading', { level: 2 }) ? 'text-blue-400' : 'text-slate-400'}`}
-          >
-            <Heading2 size={18} />
-          </button>
-          <button
-            onClick={() => editor.chain().focus().toggleBulletList().run()}
-            type="button"
-            className={`p-1.5 rounded-md transition-colors hover:bg-white/5 ${editor.isActive('bulletList') ? 'text-blue-400' : 'text-slate-400'}`}
-          >
-            <List size={18} />
-          </button>
-        </FloatingMenu>
-      )}
+      <FloatingMenu
+        editor={editor}
+        tippyOptions={{ duration: 120 }}
+        className={cn(menuClass, "ml-11.25")}
+      >
+        <MenuButton active={editor.isActive('heading', { level: 1 })} onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} label="Título 1"><Heading1 size={16} /></MenuButton>
+        <MenuButton active={editor.isActive('heading', { level: 2 })} onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} label="Título 2"><Heading2 size={16} /></MenuButton>
+        <MenuButton active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} label="Lista"><List size={16} /></MenuButton>
+      </FloatingMenu>
 
       <EditorContent editor={editor} />
     </div>

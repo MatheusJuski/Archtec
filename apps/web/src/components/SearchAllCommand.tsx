@@ -91,11 +91,11 @@ export function SearchAllCommand() {
   function renderItem(item: SearchResultItem) {
     const icon =
       item.type === "note" ? (
-        <FileText className="h-4 w-4 text-arcane" />
+        <FileText className="h-4 w-4 text-brand" />
       ) : item.type === "task" ? (
-        <ListChecks className="h-4 w-4 text-toxic" />
+        <ListChecks className="h-4 w-4 text-success" />
       ) : (
-        <CalendarDays className="h-4 w-4 text-ember" />
+        <CalendarDays className="h-4 w-4 text-signal" />
       )
 
     return (
@@ -116,10 +116,13 @@ export function SearchAllCommand() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-10 w-10 items-center justify-center rounded-sm text-relic transition-colors hover:bg-muted/50 hover:text-arcane-glow"
-        title="Busca global (Ctrl/Cmd+K)"
+        className="group relative flex h-11 w-11 items-center justify-center text-ink-muted transition-colors hover:text-foreground"
+        aria-label="Busca global (Ctrl/Cmd+K)"
       >
         <Search className="h-4.5 w-4.5" />
+        <span className="chip pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-x-1 -translate-y-1/2 whitespace-nowrap opacity-0 transition-[opacity,transform] duration-150 group-hover:translate-x-0 group-hover:opacity-100">
+          Buscar · Ctrl K
+        </span>
       </button>
 
       <CommandDialog open={open} onOpenChange={setOpen}>
@@ -130,7 +133,7 @@ export function SearchAllCommand() {
         />
         <CommandList>
           {showTypedHint ? (
-            <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+            <div className="px-3 py-8 text-center font-mono text-xs uppercase tracking-[0.08em] text-muted-foreground">
               Digite pelo menos 2 caracteres para buscar.
             </div>
           ) : null}
@@ -164,8 +167,8 @@ export function SearchAllCommand() {
           ) : null}
         </CommandList>
 
-        <div className="border-t border-border px-3 py-2 text-xs text-muted-foreground">
-          <span>Atalho</span>
+        <div className="flex items-center border-t border-line px-3 py-2 text-muted-foreground">
+          <span className="label-tech">Atalho</span>
           <CommandShortcut>Ctrl/Cmd + K</CommandShortcut>
         </div>
       </CommandDialog>

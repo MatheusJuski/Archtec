@@ -1,147 +1,126 @@
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { LoginForm } from "@/components/LoginForm";
 import { Logo } from "@/components/Logo";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  type CarouselApi,
-} from "@/components/ui/carousel";
-import Autoplay from "embla-carousel-autoplay";
-import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
+import { ShaderBackdrop } from "@/components/shader/ShaderBackdrop";
+
+const slides = [
+  {
+    tag: "Conhecimento",
+    title: "Centralize suas ideias",
+    description: "Um Segundo Cérebro digital baseado no método Zettelkasten para gestão de conhecimento.",
+  },
+  {
+    tag: "Execução",
+    title: "Foco no que importa",
+    description: "Gestão de projetos com árvores de tarefas infinitas e grafos de dependência.",
+  },
+  {
+    tag: "Finanças",
+    title: "Controle total",
+    description: "Unifique finanças, execução e conhecimento em uma única arquitetura de software.",
+  },
+];
+
+const SLIDE_MS = 5000;
+const ease = [0.22, 1, 0.36, 1] as const;
 
 export function LoginPage() {
-  const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
-  const [count, setCount] = useState(0);
-
-  const plugin = useRef(
-    Autoplay({ delay: 5000, stopOnInteraction: false })
-  );
-
-  const slides = [
-    {
-      image: "https://images.unsplash.com/photo-1507413245164-6160d8298b31?q=80&w=2070&auto=format&fit=crop",
-      title: "Centralize suas ideias",
-      description: "Um Segundo Cérebro digital baseado no método Zettelkasten para gestão de conhecimento."
-    },
-    {
-      image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?q=80&w=2070&auto=format&fit=crop",
-      title: "Foco no que importa",
-      description: "Gestão de projetos com árvores de tarefas infinitas e grafos de dependência."
-    },
-    {
-      image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&q=80&w=2000",
-      title: "Controle total",
-      description: "Unifique finanças, execução e conhecimento em uma única arquitetura de software."
-    }
-  ];
 
   useEffect(() => {
-    if (!api) {
-      return;
-    }
+    const id = window.setTimeout(() => setCurrent((i) => (i + 1) % slides.length), SLIDE_MS);
+    return () => window.clearTimeout(id);
+  }, [current]);
 
-    setCount(api.scrollSnapList().length);
-    setCurrent(api.selectedScrollSnap() + 1);
-
-    api.on("select", () => {
-      setCurrent(api.selectedScrollSnap() + 1);
-    });
-  }, [api]);
+  const slide = slides[current];
 
   return (
-    <div className="grid min-h-screen w-full lg:grid-cols-2">
-      
-      {/* --- COLUNA ESQUERDA (Visual com Imagem) --- */}
-      <div className="hidden h-full flex-col lg:flex relative border-r border-border bg-background">
-        
-        {/* Logo Discreto no Topo */}
-        <div className="absolute left-8 top-8 z-20 flex items-center tracking-tight text-foreground">
-          <Logo className="mr-3 w-8 h-8 text-foreground" />
-          <span className="text-xl font-heading tracking-wide">Archtec</span>
-        </div>
-
-        <Carousel
-          setApi={setApi}
-          plugins={[plugin.current]}
-          className="h-full w-full [&>div]:h-full"
-          opts={{ loop: true, align: "start" }}
-        >
-          <CarouselContent className="h-full ml-0"> 
-            {slides.map((slide, index) => (
-              <CarouselItem key={index} className="pl-0 flex h-full items-center justify-center">
-                 <div className="relative w-full h-full">
-                    {/* Imagem de Fundo */}
-                    <div 
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-2000"
-                      style={{ backgroundImage: `url(${slide.image})` }}
-                    />
-                    
-                    {/* Overlay Gradient */}
-                    <div className="absolute inset-0 bg-linear-to-t from-background via-background/60 to-transparent" />
-
-                    {/* Conteúdo Centralizado na parte inferior */}
-                    <div className="absolute bottom-24 left-0 right-0 px-12 text-center z-20 flex flex-col items-center">
-                      <h2 className="font-heading text-4xl text-foreground mb-3">
-                        {slide.title}
-                      </h2>
-                      <p className="text-lg text-muted-foreground font-sans font-light max-w-md">
-                        {slide.description}
-                      </p>
-                    </div>
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
-
-        {/* --- INDICADORES (BARRINHAS) --- */}
-        <div className="absolute bottom-12 left-0 right-0 flex justify-center gap-2 z-30">
-          {Array.from({ length: count }).map((_, index) => (
-            <button
-              key={index}
-              className={cn(
-                "h-1.5 rounded-full transition-all duration-300 ease-out",
-                current === index + 1 
-                  ? "w-8 bg-primary" 
-                  : "w-1.5 bg-primary/30 hover:bg-primary/50"
-              )}
-              onClick={() => api?.scrollTo(index)}
-              aria-label={`Ir para slide ${index + 1}`}
-            />
-          ))}
-        </div>
-
-      </div>
-
-      {/* --- COLUNA DIREITA --- */}
-      <div className="relative flex items-center justify-center p-8 h-full overflow-hidden bg-background">
-        
-        {/* Efeito Aurora 1 */}
-        <div className="absolute top-[-10%] right-[-10%] w-125 h-125 bg-blue-600/15 blur-[120px] rounded-full pointer-events-none" />
-        
-        {/* Efeito Aurora 2 */}
-        <div className="absolute bottom-[-15%] left-[-10%] w-150 h-150 bg-indigo-900/20 blur-[120px] rounded-full pointer-events-none" />
-        
-        {/* Gradiente sutil central */}
-        <div className="absolute inset-0 bg-linear-to-br from-transparent via-[#12122b]/30 to-transparent pointer-events-none" />
-
-        <div className="mx-auto flex w-full flex-col justify-center space-y-8 sm:w-87.5 relative z-10">
-          
-          {/* Logo Mobile */}
-          <div className="lg:hidden flex items-center justify-center mb-6 text-foreground">
-             <Logo className="mr-3 w-10 h-10 text-foreground" />
-             <span className="text-2xl font-heading tracking-wide">Archtec</span>
+    <div className="grid min-h-dvh w-full lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
+      {/* --- Painel visual --- */}
+      <ShaderBackdrop forceDark className="hidden border-r border-ink lg:block">
+        <div className="flex h-full flex-col justify-between p-10 text-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Logo className="h-9 text-white" />
+              <span className="font-heading text-lg font-bold tracking-tight">Archtec</span>
+            </div>
+            <span className="label-tech border border-white/40 px-2 py-1.5 text-white/80">Life OS</span>
           </div>
 
-          {/* Wrapper do Formulário (O título dinâmico agora vive dentro do LoginForm) */}
-          <div className="[&>div]:border-0 [&>div]:shadow-none [&>div]:bg-transparent [&>div]:p-0">
-             <LoginForm />
+          <div>
+            <motion.h1
+              initial={{ opacity: 0, y: 24 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease }}
+              className="font-heading text-[clamp(4.5rem,9vw,9rem)] font-bold leading-[0.82] tracking-[-0.06em] mix-blend-overlay"
+              aria-hidden
+            >
+              ARCH
+              <br />
+              TEC.
+            </motion.h1>
+
+            <div className="mt-10 max-w-md">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={current}
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.4, ease }}
+                >
+                  <span className="chip bg-white text-black">{slide.tag}</span>
+                  <h2 className="mt-4 font-heading text-3xl font-bold tracking-tight">{slide.title}</h2>
+                  <p className="mt-2 text-white/80">{slide.description}</p>
+                </motion.div>
+              </AnimatePresence>
+
+              <div className="mt-8 flex gap-2">
+                {slides.map((s, index) => (
+                  <button
+                    key={s.tag}
+                    onClick={() => setCurrent(index)}
+                    aria-label={`Ir para slide ${index + 1}`}
+                    className="relative h-1 w-14 overflow-hidden bg-white/25"
+                  >
+                    {index === current && (
+                      <motion.span
+                        key={current}
+                        className="absolute inset-y-0 left-0 bg-white"
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: SLIDE_MS / 1000, ease: "linear" }}
+                      />
+                    )}
+                    {index < current && <span className="absolute inset-0 bg-white/70" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </ShaderBackdrop>
+
+      {/* --- Formulário --- */}
+      <div className="dot-field relative flex items-center justify-center px-5 py-10 sm:px-8">
+        <div className="relative z-10 flex w-full max-w-sm flex-col gap-8">
+          <div className="flex items-center gap-3 text-foreground lg:hidden">
+            <Logo className="h-10" />
+            <span className="font-heading text-2xl font-bold tracking-tight">Archtec</span>
           </div>
 
-          <p className="px-8 text-center text-sm font-sans text-muted-foreground/50">
-            © 2026 Architect Inc.
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease, delay: 0.1 }}
+            className="border border-ink bg-card p-6 shadow-[6px_6px_0_0_var(--ink)] sm:p-8"
+          >
+            <LoginForm />
+          </motion.div>
+
+          <p className="label-tech text-center text-muted-foreground">
+            © {new Date().getFullYear()} Archtec
           </p>
         </div>
       </div>
