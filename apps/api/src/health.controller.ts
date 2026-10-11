@@ -5,6 +5,15 @@ import { PrismaService } from './prisma/prisma.service';
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Liveness sem tocar no banco: usado pelo ping externo para manter a API acordada
+   * sem impedir o Postgres (Neon) de hibernar.
+   */
+  @Get('live')
+  live() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
   @Get()
   async check() {
     try {

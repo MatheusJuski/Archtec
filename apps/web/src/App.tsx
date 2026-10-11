@@ -8,6 +8,7 @@ import { DashboardPage } from "@/pages/DashboardPage";
 import { AuthGuard } from "@/components/AuthGuard";
 import { AppLayout } from "@/components/AppLayout";
 import { Toaster } from "@/components/ui/sonner";
+import { ServerWakeIndicator } from "@/components/ServerWakeIndicator";
 import { useEffect } from "react";
 import { useThemeStore } from "@/store/theme";
 
@@ -48,6 +49,7 @@ function App() {
         </Routes>
 
         <Toaster position="top-right" richColors />
+        <ServerWakeIndicator />
       </div>
     </BrowserRouter>
   );
