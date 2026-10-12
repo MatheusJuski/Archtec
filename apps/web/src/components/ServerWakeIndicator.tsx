@@ -26,24 +26,33 @@ export function ServerWakeIndicator() {
     let retryTimer: number | undefined;
     let hideTimer: number | undefined;
 
+    const markOnline = () => {
+      if (cancelled) return;
+      window.clearTimeout(slowTimer);
+      window.clearInterval(tick);
+      setStatus((prev) => {
+        if (prev === "waking") {
+          hideTimer = window.setTimeout(() => !cancelled && setStatus("idle"), 2000);
+          return "online";
+        }
+        return "idle";
+      });
+    };
+
     const ping = () => {
       api
         .get("/health/live", { timeout: 70_000 })
-        .then(() => {
+        .then(markOnline)
+        .catch((error) => {
           if (cancelled) return;
-          window.clearTimeout(slowTimer);
-          window.clearInterval(tick);
-          setStatus((prev) => {
-            if (prev === "waking") {
-              hideTimer = window.setTimeout(() => !cancelled && setStatus("idle"), 2000);
-              return "online";
-            }
-            return "idle";
-          });
-        })
-        .catch(() => {
-          // Erro de rede / 502 enquanto o serviço sobe: tenta de novo
-          if (!cancelled) retryTimer = window.setTimeout(ping, RETRY_MS);
+          const status: number | undefined = error?.response?.status;
+          // Qualquer resposta HTTP (ex.: 404 numa API sem /health/live) prova que o servidor
+          // está de pé. Só erro de rede ou 502/503/504 do proxy significam "ainda acordando".
+          if (status !== undefined && ![502, 503, 504].includes(status)) {
+            markOnline();
+            return;
+          }
+          retryTimer = window.setTimeout(ping, RETRY_MS);
         });
     };
     ping();
@@ -69,7 +78,7 @@ export function ServerWakeIndicator() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 12 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="fixed bottom-20 left-1/2 z-[60] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 border border-ink bg-card px-4 py-3 shadow-[4px_4px_0_0_var(--ink)] md:bottom-6"
+          className="fixed bottom-20 left-1/2 z-60 flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-center gap-3 border border-ink bg-card px-4 py-3 shadow-hard md:bottom-6"
         >
           {status === "waking" ? (
             <>
