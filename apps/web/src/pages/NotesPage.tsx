@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { api } from "@/lib/api";
+import { api, getApiErrorStatus } from "@/lib/api";
+import { clearNoteDraft, loadNoteDraft, saveNoteDraft, type NoteDraft } from "@/lib/note-draft";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "motion/react";
 import { Button } from "@/components/ui/button";
@@ -21,11 +22,23 @@ const saveLabels = {
 
 const stripHtml = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
+type NoteTag = string | { name: string };
+
 export interface NoteData {
   id: string;
   title: string;
   content: string;
-  tags?: any[];
+  tags?: NoteTag[];
+}
+
+const tagNames = (tags?: NoteTag[]) => tags?.map((t) => (typeof t === "string" ? t : t.name)) ?? [];
+
+const sameTags = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+/** O editor tem algo diferente do que o servidor conhece? */
+function hasUnsavedChanges(note: NoteData | null, title: string, content: string, tags: string[]) {
+  if (!note) return Boolean(title.trim()) || (Boolean(content) && content !== "<p></p>") || tags.length > 0;
+  return note.title !== title || (note.content || "") !== content || !sameTags(tagNames(note.tags), tags);
 }
 
 export function NotesPage() {
@@ -44,6 +57,10 @@ export function NotesPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [listOpen, setListOpen] = useState(isDesktop);
+  const [notesLoaded, setNotesLoaded] = useState(false);
+  // Rascunho a aplicar quando a nota correspondente for carregada no editor
+  const pendingDraftRef = useRef<NoteDraft | null>(null);
+  const draftOfferedRef = useRef(false);
 
   const debouncedTitle = useDebounce(title, 1000);
   const debouncedContent = useDebounce(content, 1000);
@@ -61,8 +78,11 @@ export function NotesPage() {
 
   // 2. CARREGAMENTO INICIAL
   useEffect(() => {
-    api.get("/notes")
-       .then(response => setNotes(response.data))
+    api.get<NoteData[]>("/notes")
+       .then(response => {
+         setNotes(response.data);
+         setNotesLoaded(true);
+       })
        .catch(() => toast.error("Erro ao carregar notas"));
   }, []);
 
@@ -82,7 +102,7 @@ export function NotesPage() {
           const latestTitle = titleRef.current;
             const latestContent = contentRef.current;
             const latestTags = tagsRef.current;
-            const oldTags = oldNote.tags?.map(t => typeof t === 'string' ? t : t.name) || [];
+            const oldTags = tagNames(oldNote.tags);
 
             // Se algo foi alterado, despacha pro banco em background
           if (
@@ -90,11 +110,22 @@ export function NotesPage() {
             oldNote.content !== latestContent ||
             JSON.stringify(oldTags) !== JSON.stringify(latestTags)
           ) {
-            api.patch(`/notes/${loadedNoteId}`, {
+            const leavingNoteId = loadedNoteId;
+            api.patch(`/notes/${leavingNoteId}`, {
              title: latestTitle.trim() || "Nova Nota",
              content: latestContent,
              tags: latestTags,
-            }).catch(() => {});
+            })
+              .then(() => {
+                if (loadNoteDraft()?.noteId === leavingNoteId) clearNoteDraft();
+              })
+              .catch(() => {
+                // Não engole o erro: guarda o conteúdo e avisa
+                saveNoteDraft({ noteId: leavingNoteId, title: latestTitle, content: latestContent, tags: latestTags });
+                toast.error("Não foi possível salvar a nota anterior.", {
+                  description: "O conteúdo ficou guardado como rascunho neste navegador.",
+                });
+              });
                // Mantém a lista atualizada
             setNotes(prev => prev.map(n => n.id === loadedNoteId ? {
              ...n,
@@ -110,19 +141,72 @@ export function NotesPage() {
       if (activeNoteId && notes.length > 0) {
          const selectedNote = notes.find((n) => n.id === activeNoteId);
          if (selectedNote) {
-          setTitle(selectedNote.title || "");
-            setContent(selectedNote.content || "");
-            setTags(selectedNote.tags?.map(t => typeof t === 'string' ? t : t.name) || []);
+          const draft = pendingDraftRef.current?.noteId === activeNoteId ? pendingDraftRef.current : null;
+          pendingDraftRef.current = null;
+          setTitle(draft ? draft.title : selectedNote.title || "");
+            setContent(draft ? draft.content : selectedNote.content || "");
+            setTags(draft ? draft.tags : tagNames(selectedNote.tags));
             setLoadedNoteId(activeNoteId);
          }
       } else if (!activeNoteId) {
-        setTitle("");
-         setContent("");
-         setTags([]);
+        const draft = pendingDraftRef.current?.noteId === null ? pendingDraftRef.current : null;
+        pendingDraftRef.current = null;
+        setTitle(draft?.title ?? "");
+         setContent(draft?.content ?? "");
+         setTags(draft?.tags ?? []);
          setLoadedNoteId(null);
       }
     }
   }, [activeNoteId, notes, loadedNoteId]);
+
+  // 3b. RASCUNHO LOCAL: enquanto o servidor não confirmar, o texto fica guardado no navegador
+  useEffect(() => {
+    if (loadedNoteId !== activeNoteId) return;
+    if (activeNoteId && !activeNote) return;
+    if (hasUnsavedChanges(activeNote, title, content, tags)) {
+      saveNoteDraft({ noteId: activeNoteId, title, content, tags });
+    } else if (loadNoteDraft()?.noteId === activeNoteId) {
+      clearNoteDraft();
+    }
+  }, [title, content, tags, activeNote, activeNoteId, loadedNoteId]);
+
+  // 3c. Ao abrir a página, oferece restaurar um rascunho que não chegou ao servidor
+  useEffect(() => {
+    if (!notesLoaded || draftOfferedRef.current) return;
+    draftOfferedRef.current = true;
+
+    const draft = loadNoteDraft();
+    if (!draft) return;
+    const serverNote = draft.noteId ? notes.find((n) => n.id === draft.noteId) ?? null : null;
+    if (draft.noteId && !serverNote) {
+      clearNoteDraft(); // a nota foi excluída
+      return;
+    }
+    if (!hasUnsavedChanges(serverNote, draft.title, draft.content, draft.tags)) {
+      clearNoteDraft(); // o servidor já tem esse conteúdo
+      return;
+    }
+
+    toast("Há um rascunho não salvo", {
+      id: "note-draft",
+      description: `"${draft.title.trim() || "Sem título"}" · ${new Date(draft.savedAt).toLocaleString("pt-BR")}`,
+      duration: Infinity,
+      action: {
+        label: "Restaurar",
+        onClick: () => {
+          if (draft.noteId === activeNoteId && loadedNoteId === activeNoteId) {
+            setTitle(draft.title);
+            setContent(draft.content);
+            setTags(draft.tags);
+          } else {
+            pendingDraftRef.current = draft;
+            navigate(draft.noteId ? `/notes/${draft.noteId}` : "/notes");
+          }
+        },
+      },
+      cancel: { label: "Descartar", onClick: () => clearNoteDraft() },
+    });
+  }, [notesLoaded, notes, activeNoteId, loadedNoteId, navigate]);
 
   // 4. HANDLERS (Otimizados)
   const handleKeyDownTag = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -158,8 +242,7 @@ export function NotesPage() {
     if (activeNote) {
       const titleUnchanged = debouncedTitle === (activeNote.title || "");
       const contentUnchanged = debouncedContent === (activeNote.content || "");
-      const loadedTags = activeNote.tags ? activeNote.tags.map(t => typeof t === 'string' ? t : t.name) : [];
-      const tagsUnchanged = debouncedTags.length === loadedTags.length && debouncedTags.every((val, index) => val === loadedTags[index]);
+      const tagsUnchanged = sameTags(debouncedTags, tagNames(activeNote.tags));
       
       if (titleUnchanged && contentUnchanged && tagsUnchanged) return;
     }
@@ -185,10 +268,14 @@ export function NotesPage() {
           ));
         }
 
+        if (loadNoteDraft()?.noteId === activeNoteId) clearNoteDraft();
         setSaveStatus("saved");
         setTimeout(() => setSaveStatus("idle"), 2000);
       } catch (error) {
-        toast.error("Falha ao salvar");
+        // Sessão expirada já é avisada pelo interceptor; o rascunho local preserva o texto
+        if (getApiErrorStatus(error) !== 401) {
+          toast.error("Falha ao salvar", { description: "Suas alterações estão guardadas como rascunho neste navegador." });
+        }
         setSaveStatus("idle");
       }
     }
@@ -210,7 +297,7 @@ export function NotesPage() {
       setNotes((prev) => prev.filter((n) => n.id !== id));
       if (id === activeNoteId) handleResetEditor();
       toast.success("Nota removida!");
-    } catch (error) {
+    } catch {
       toast.error("Erro ao deletar nota");
     }
   }, [activeNoteId, handleResetEditor]);

@@ -86,7 +86,10 @@ export class SearchService {
       id: item.id,
       type: 'note',
       title: item.title || 'Sem título',
-      subtitle: item.content?.replace(/<[^>]+>/g, ' ').trim().slice(0, 100),
+      subtitle: item.content
+        ?.replace(/<[^>]+>/g, ' ')
+        .trim()
+        .slice(0, 100),
       url: `/notes/${item.id}`,
       createdAt: item.createdAt,
     }));

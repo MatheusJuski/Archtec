@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { api } from "@/lib/api"
+import { api, getApiErrorMessage, getApiErrorStatus, RATE_LIMIT_MESSAGE } from "@/lib/api"
 import { useAuthStore } from "@/store/auth"
 import { Divider } from "@/components/ui/divider"
 import { AnimatePresence, motion } from "motion/react"
@@ -81,10 +81,15 @@ export function LoginForm() {
         signIn(response.data.access_token)
         toast.success("Login realizado com sucesso!")
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error(error)
-      if (isRegistering) {
-        if (error.response?.status === 409 || error.response?.data?.message?.includes("exist")) {
+      const status = getApiErrorStatus(error)
+      if (status === 429) {
+        toast.error(RATE_LIMIT_MESSAGE)
+      } else if (status === undefined) {
+        toast.error("Não foi possível conectar ao servidor. Tente novamente.")
+      } else if (isRegistering) {
+        if (status === 409 || getApiErrorMessage(error, "").includes("exist")) {
           toast.error("Este e-mail já está em uso.")
         } else {
           toast.error("Erro ao criar conta.")
@@ -111,7 +116,7 @@ export function LoginForm() {
       toast.success("Login com Google realizado com sucesso!")
     } catch (error) {
       console.error(error)
-      toast.error("Não foi possível entrar com Google.")
+      toast.error(getApiErrorStatus(error) === 429 ? RATE_LIMIT_MESSAGE : "Não foi possível entrar com Google.")
     } finally {
       setIsGoogleLoading(false)
     }

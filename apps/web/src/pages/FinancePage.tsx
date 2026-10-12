@@ -15,7 +15,7 @@ import { z } from "zod"
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
 
 import { motion } from "motion/react"
-import { api } from "@/lib/api"
+import { api, getApiErrorMessage } from "@/lib/api"
 import { Panel } from "@/components/ui/panel"
 import { PageHeader } from "@/components/ui/page-header"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -263,7 +263,7 @@ export function FinancePage() {
     setIsCreateOpen(true)
   }
 
-  function openEditModal(transaction: Transaction) {
+  const openEditModal = useCallback((transaction: Transaction) => {
     setTransactionToEdit(transaction)
     form.reset({
       type: transaction.type,
@@ -278,7 +278,7 @@ export function FinancePage() {
         : undefined,
     })
     setIsCreateOpen(true)
-  }
+  }, [form])
 
   async function onCreateTransaction(values: CreateTransactionValues) {
     setSaving(true)
@@ -305,17 +305,16 @@ export function FinancePage() {
       setTransactionToEdit(null)
       resetFormToDefaults()
       toast.success(transactionToEdit ? "Transação atualizada com sucesso" : "Transação criada com sucesso")
-    } catch (error: any) {
-      const message = error?.response?.data?.message
-      toast.error(Array.isArray(message) ? message[0] : message || "Erro ao salvar transação")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao salvar transação"))
     } finally {
       setSaving(false)
     }
   }
 
-  function openDeleteModal(transaction: Transaction) {
+  const openDeleteModal = useCallback((transaction: Transaction) => {
     setTransactionToDelete(transaction)
-  }
+  }, [])
 
   async function confirmDeleteTransaction() {
     if (!transactionToDelete) return
@@ -326,9 +325,8 @@ export function FinancePage() {
       await fetchTransactions()
       setTransactionToDelete(null)
       toast.success("Transação excluída")
-    } catch (error: any) {
-      const message = error?.response?.data?.message
-      toast.error(Array.isArray(message) ? message[0] : message || "Erro ao excluir transação")
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao excluir transação"))
     } finally {
       setDeleting(false)
     }

@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, Request, UseGuards, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  Body,
+  Query,
+  Request,
+  UseGuards,
+  NotFoundException,
+} from '@nestjs/common';
 import { TasksService } from './tasks.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('tasks')
 @UseGuards(JwtAuthGuard)
@@ -8,14 +20,14 @@ export class TasksController {
   constructor(private readonly tasksService: TasksService) {}
 
   @Get()
-  findAll(@Request() req, @Query('tree') tree?: string) {
+  findAll(@Request() req: AuthenticatedRequest, @Query('tree') tree?: string) {
     const buildTree = tree === 'true';
     return this.tasksService.findAll(req.user.userId, buildTree);
   }
 
   @Post()
   create(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Body()
     body: {
       title: string;
@@ -30,15 +42,23 @@ export class TasksController {
 
   @Patch(':id/move')
   move(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Param('id') id: string,
     @Body() body: { parentId: string | null; order?: number },
   ) {
-    return this.tasksService.moveTask(id, req.user.userId, body.parentId, body.order);
+    return this.tasksService.moveTask(
+      id,
+      req.user.userId,
+      body.parentId,
+      body.order,
+    );
   }
 
   @Patch(':id/toggle')
-  async toggleComplete(@Request() req, @Param('id') id: string) {
+  async toggleComplete(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+  ) {
     try {
       return await this.tasksService.toggleComplete(id, req.user.userId);
     } catch {

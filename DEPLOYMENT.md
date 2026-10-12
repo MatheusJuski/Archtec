@@ -44,6 +44,10 @@ Observacao:
 - GOOGLE_CLIENT_ID (se Google Sign-In estiver ativo)
 - CORS_ORIGIN (URL do frontend em producao, ex: https://seu-app.vercel.app)
 
+Opcional:
+
+- TRUST_PROXY (padrao 1): quantos proxies ficam na frente da API. Usado para descobrir o IP real do cliente no rate limit. No Render, 1 funciona.
+
 ### 2.3 Prisma migration
 
 Depois de publicar o primeiro deploy, rode no shell do servico:
@@ -53,6 +57,20 @@ Depois de publicar o primeiro deploy, rode no shell do servico:
 Se preferir, adicione no Start command:
 
 - npx prisma migrate deploy && npm run start:prod
+
+### 2.4 Manter a API acordada (plano gratuito do Render)
+
+No plano gratuito, o Render desliga a API apos ~15 min sem requisicoes, e a primeira requisicao seguinte leva 30-60 s.
+
+1. Confirme que `https://SUA-API.onrender.com/health/live` responde `{"status":"ok"}`.
+2. Crie um cronjob gratuito em https://cron-job.org:
+   - URL: `https://SUA-API.onrender.com/health/live`
+   - Frequencia: a cada 10 minutos
+3. Uma instancia ligada 24/7 consome ~744 h/mes, dentro das 750 h gratuitas do Render. Se houver outro servico gratuito na mesma conta, as horas sao compartilhadas.
+
+Por que `/health/live` e nao `/health`: o `/health` consulta o banco, e um ping a cada 10 min impediria o Neon de hibernar, consumindo as horas gratuitas dele. O `/health/live` nao toca no banco.
+
+Enquanto a API acorda, o frontend mostra "Acordando o servidor..." (ping em `/up`).
 
 ## Etapa 3 - Deploy do Frontend (Vercel)
 
@@ -67,6 +85,10 @@ Se preferir, adicione no Start command:
 
 - VITE_API_URL (URL publica do backend, ex: https://api-seu-app.onrender.com)
 - VITE_GOOGLE_CLIENT_ID (mesmo valor configurado no backend)
+
+### 3.3 Rotas da SPA
+
+O arquivo `apps/web/vercel.json` redireciona qualquer rota para o `index.html`. Sem ele, atualizar a pagina em `/notes` ou abrir um link direto retorna 404 da Vercel. Arquivos estaticos (`/assets/*`) continuam sendo servidos normalmente.
 
 ## Etapa 4 - Google Sign-In (o que precisa para funcionar)
 
@@ -148,11 +170,19 @@ Confirme:
 - Cookies e tokens trafegam apenas em HTTPS em producao.
 - Se usar proxy/CDN, habilite HSTS e X-Content-Type-Options.
 
-### 6.6 Rotina de monitoramento
+### 6.6 Rate limit
+
+Confirme que o limite por IP esta ativo e que cada usuario tem o seu proprio contador:
+
+- Mais de 10 tentativas de login em 1 minuto, do mesmo IP, devem retornar 429.
+- Outro usuario, em outra rede, deve continuar entrando normalmente.
+- Se todos receberem 429 juntos, a API esta vendo o IP do proxy: revise `TRUST_PROXY`.
+
+### 6.7 Rotina de monitoramento
 
 - Crie alerta para erro 5xx no provedor (Render/Railway/Vercel).
 - Crie alerta para picos de latencia no backend.
-- Revise logs de autenticacao (falhas repetidas de login).
+- Revise logs de autenticacao (falhas repetidas de login e respostas 429).
 
 ## Seguranca e boas praticas
 
@@ -162,7 +192,29 @@ Confirme:
 - Habilitar backups automaticos no banco gerenciado.
 - Criar ambiente separado para staging.
 
+## Integracao continua (CI)
+
+O workflow `.github/workflows/ci.yml` roda a cada push na `main` e em todo pull request:
+
+- Web: `npm ci`, `npm run lint`, `npm run build`.
+- API: `npm ci`, `prisma generate`, `format:check`, `lint:check`, typecheck, `npm test`, `npm run build`.
+
+Recomendado: proteger a branch `main` exigindo o CI verde antes do merge (Settings > Branches).
+
 ## Runbook rapido de troubleshoot
+
+### 404 ao atualizar a pagina
+
+- Verifique se `apps/web/vercel.json` foi publicado (Root Directory = apps/web).
+
+### "Acordando o servidor..." nao some
+
+- A API pode estar realmente fora do ar: abra `/health/live` direto no navegador.
+- `ERR_BLOCKED_BY_CLIENT` no console vem de extensao do navegador (bloqueador de anuncios). O frontend usa `/up` justamente para evitar isso; se ainda assim for bloqueado, o aviso some apos 90 s ou na primeira resposta da API.
+
+### Todos os usuarios recebem 429
+
+- A API esta contando todos com o IP do proxy. Ajuste `TRUST_PROXY` e reinicie o backend.
 
 ### 401 no login Google
 
@@ -184,4 +236,8 @@ Confirme:
 - apps/api/.env.example
 - apps/web/.env.example
 - apps/api/src/users/users.service.ts
+- apps/api/src/throttle.config.ts
+- apps/api/src/health.controller.ts
 - apps/web/src/components/LoginForm.tsx
+- apps/web/vercel.json
+- .github/workflows/ci.yml

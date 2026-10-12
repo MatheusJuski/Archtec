@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountEntryDto } from './dto/create-account-entry.dto';
@@ -63,7 +64,7 @@ export class FinanceService {
   async listAccounts(userId: string, month?: number, year?: number) {
     await this.markOverdue(userId);
 
-    const where: any = { userId };
+    const where: Prisma.AccountEntryWhereInput = { userId };
 
     if (month && year) {
       const start = new Date(year, month - 1, 1, 0, 0, 0, 0);
@@ -122,8 +123,24 @@ export class FinanceService {
     await this.markOverdue(userId);
 
     const now = new Date();
-    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1, 0, 0, 0, 0);
+    const startMonth = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
+    const endMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      1,
+      0,
+      0,
+      0,
+      0,
+    );
     const startToday = new Date(now);
     startToday.setHours(0, 0, 0, 0);
     const endToday = new Date(now);
@@ -177,7 +194,8 @@ export class FinanceService {
     ]);
 
     const income = txGrouped.find((t) => t.type === 'INCOME')?._sum.amount ?? 0;
-    const expense = txGrouped.find((t) => t.type === 'EXPENSE')?._sum.amount ?? 0;
+    const expense =
+      txGrouped.find((t) => t.type === 'EXPENSE')?._sum.amount ?? 0;
 
     const receivableOpen = accountsDue
       .filter((a) => a.type === 'RECEIVABLE')

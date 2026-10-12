@@ -1,23 +1,33 @@
-import { Injectable, ConflictException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import * as bcrypt from 'bcrypt';
-import { JwtService } from '@nestjs/jwt'; 
-import { OAuth2Client } from 'google-auth-library';
+import { JwtService } from '@nestjs/jwt';
+import { LoginTicket, OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UsersService {
-  private readonly googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  private readonly googleClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+  );
 
   constructor(
-    private prisma: PrismaService, 
-    private jwtService: JwtService
+    private prisma: PrismaService,
+    private jwtService: JwtService,
   ) {}
 
-  private buildAuthResponse(user: { id: string; email: string; name: string | null }) {
+  private buildAuthResponse(user: {
+    id: string;
+    email: string;
+    name: string | null;
+  }) {
     const payload = { email: user.email, sub: user.id };
 
     return {
@@ -61,7 +71,7 @@ export class UsersService {
   }
 
   async googleAuth(dto: GoogleAuthDto) {
-    let ticket;
+    let ticket: LoginTicket;
 
     try {
       ticket = await this.googleClient.verifyIdToken({

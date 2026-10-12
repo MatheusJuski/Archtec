@@ -1,7 +1,7 @@
 {
   "name": "archtec",
   "version": "1.0.0",
-  "description": "Architect (Life OS)\r Um \"Segundo Cérebro\" digital. Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro.",
+  "description": "Archtec (Life OS): um \"Segundo Cérebro\" digital. Um sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro.",
   "main": "index.js",
   "scripts": {
     "test": "npm --prefix apps/api run test"

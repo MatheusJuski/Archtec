@@ -23,7 +23,11 @@ export class TransactionsService {
     const targetYear = source.getFullYear();
     const targetMonthIndex = source.getMonth() + monthsToAdd;
     const firstOfTargetMonth = new Date(targetYear, targetMonthIndex, 1);
-    const lastDayOfTargetMonth = new Date(targetYear, targetMonthIndex + 1, 0).getDate();
+    const lastDayOfTargetMonth = new Date(
+      targetYear,
+      targetMonthIndex + 1,
+      0,
+    ).getDate();
     const targetDay = Math.min(source.getDate(), lastDayOfTargetMonth);
 
     return new Date(
@@ -37,7 +41,10 @@ export class TransactionsService {
     );
   }
 
-  private addRecurrenceDate(source: Date, recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY') {
+  private addRecurrenceDate(
+    source: Date,
+    recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY',
+  ) {
     switch (recurrenceFrequency) {
       case 'DAILY': {
         const next = new Date(source);
@@ -88,7 +95,10 @@ export class TransactionsService {
 
     for (const tx of recurring) {
       const recurrenceFrequency = tx.recurrenceFrequency ?? 'MONTHLY';
-      const nextDate = this.addRecurrenceDate(tx.occurredAt, recurrenceFrequency);
+      const nextDate = this.addRecurrenceDate(
+        tx.occurredAt,
+        recurrenceFrequency,
+      );
       if (nextDate < todayStart || nextDate > todayEnd) {
         continue;
       }
@@ -263,12 +273,18 @@ export class TransactionsService {
         description: dto.description?.trim() || null,
         occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
         isRecurring: dto.isRecurring ?? false,
-        recurrenceFrequency: dto.isRecurring ? dto.recurrenceFrequency ?? 'MONTHLY' : null,
+        recurrenceFrequency: dto.isRecurring
+          ? (dto.recurrenceFrequency ?? 'MONTHLY')
+          : null,
       },
     });
   }
 
-  async update(userId: string, transactionId: string, dto: CreateTransactionDto) {
+  async update(
+    userId: string,
+    transactionId: string,
+    dto: CreateTransactionDto,
+  ) {
     const updated = await this.prisma.transaction.updateMany({
       where: {
         id: transactionId,
@@ -282,7 +298,9 @@ export class TransactionsService {
         description: dto.description?.trim() || null,
         occurredAt: dto.occurredAt ? new Date(dto.occurredAt) : new Date(),
         isRecurring: dto.isRecurring ?? false,
-        recurrenceFrequency: dto.isRecurring ? dto.recurrenceFrequency ?? 'MONTHLY' : null,
+        recurrenceFrequency: dto.isRecurring
+          ? (dto.recurrenceFrequency ?? 'MONTHLY')
+          : null,
       },
     });
 

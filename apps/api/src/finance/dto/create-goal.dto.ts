@@ -1,4 +1,11 @@
-import { IsInt, IsNumber, IsString, Max, Min, MinLength } from 'class-validator';
+import {
+  IsInt,
+  IsNumber,
+  IsString,
+  Max,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateGoalDto {
   @IsInt()

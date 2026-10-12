@@ -36,7 +36,14 @@ describe('TransactionsService', () => {
     });
 
     expect(prismaMock.transaction.groupBy).toHaveBeenCalledTimes(1);
-    const call = prismaMock.transaction.groupBy.mock.calls[0][0];
+    const [[call]] = prismaMock.transaction.groupBy.mock.calls as [
+      [
+        {
+          by: string[];
+          where: { userId: string; occurredAt: { gte: Date; lt: Date } };
+        },
+      ],
+    ];
     expect(call.by).toEqual(['type']);
     expect(call.where.userId).toBe('user-1');
     expect(call.where.occurredAt.gte.getFullYear()).toBe(2026);
@@ -46,7 +53,9 @@ describe('TransactionsService', () => {
   });
 
   it('deve retornar zero quando não existir tipo no agrupamento', async () => {
-    prismaMock.transaction.groupBy.mockResolvedValue([{ type: 'EXPENSE', _sum: { amount: 900 } }]);
+    prismaMock.transaction.groupBy.mockResolvedValue([
+      { type: 'EXPENSE', _sum: { amount: 900 } },
+    ]);
 
     const result = await service.summary('user-1', 4, 2026);
 
@@ -56,8 +65,12 @@ describe('TransactionsService', () => {
   });
 
   it('deve propagar erro do prisma em caso de falha', async () => {
-    prismaMock.transaction.groupBy.mockRejectedValue(new Error('Falha no banco'));
+    prismaMock.transaction.groupBy.mockRejectedValue(
+      new Error('Falha no banco'),
+    );
 
-    await expect(service.summary('user-1', 4, 2026)).rejects.toThrow('Falha no banco');
+    await expect(service.summary('user-1', 4, 2026)).rejects.toThrow(
+      'Falha no banco',
+    );
   });
 });

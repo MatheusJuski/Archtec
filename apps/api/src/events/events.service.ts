@@ -15,7 +15,10 @@ const EVENT_FUTURE_LIMIT_YEARS = 10;
 export class EventsService {
   constructor(private prisma: PrismaService) {}
 
-  private addRecurrenceDate(source: Date, recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY') {
+  private addRecurrenceDate(
+    source: Date,
+    recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY',
+  ) {
     const next = new Date(source);
     switch (recurrenceFrequency) {
       case 'DAILY':
@@ -54,8 +57,14 @@ export class EventsService {
 
     for (const event of recurringEvents) {
       const recurrenceFrequency = event.recurrenceFrequency ?? 'MONTHLY';
-      const nextStart = this.addRecurrenceDate(event.startTime, recurrenceFrequency);
-      const nextEnd = this.addRecurrenceDate(event.endTime, recurrenceFrequency);
+      const nextStart = this.addRecurrenceDate(
+        event.startTime,
+        recurrenceFrequency,
+      );
+      const nextEnd = this.addRecurrenceDate(
+        event.endTime,
+        recurrenceFrequency,
+      );
 
       if (nextStart < todayStart || nextStart > todayEnd) {
         continue;
@@ -68,8 +77,24 @@ export class EventsService {
           isRecurring: true,
           recurrenceFrequency,
           startTime: {
-            gte: new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate(), 0, 0, 0, 0),
-            lt: new Date(nextStart.getFullYear(), nextStart.getMonth(), nextStart.getDate() + 1, 0, 0, 0, 0),
+            gte: new Date(
+              nextStart.getFullYear(),
+              nextStart.getMonth(),
+              nextStart.getDate(),
+              0,
+              0,
+              0,
+              0,
+            ),
+            lt: new Date(
+              nextStart.getFullYear(),
+              nextStart.getMonth(),
+              nextStart.getDate() + 1,
+              0,
+              0,
+              0,
+              0,
+            ),
           },
         },
         select: { id: true },
@@ -109,10 +134,17 @@ export class EventsService {
     }
 
     if (end <= start) {
-      throw new BadRequestException('A hora de término deve ser posterior ao início');
+      throw new BadRequestException(
+        'A hora de término deve ser posterior ao início',
+      );
     }
 
-    if (start < minAllowed || start > maxAllowed || end < minAllowed || end > maxAllowed) {
+    if (
+      start < minAllowed ||
+      start > maxAllowed ||
+      end < minAllowed ||
+      end > maxAllowed
+    ) {
       throw new BadRequestException(
         `Eventos só podem ficar entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`,
       );
@@ -148,7 +180,9 @@ export class EventsService {
       });
 
       if (!task) {
-        throw new BadRequestException('Tarefa inválida para vincular ao evento');
+        throw new BadRequestException(
+          'Tarefa inválida para vincular ao evento',
+        );
       }
     }
 
@@ -173,7 +207,9 @@ export class EventsService {
         startTime: start,
         endTime: end,
         isRecurring: dto.isRecurring ?? false,
-        recurrenceFrequency: dto.isRecurring ? dto.recurrenceFrequency ?? 'MONTHLY' : null,
+        recurrenceFrequency: dto.isRecurring
+          ? (dto.recurrenceFrequency ?? 'MONTHLY')
+          : null,
         userId,
         taskId: dto.taskId ?? null,
         noteId: dto.noteId ?? null,

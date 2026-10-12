@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException, ForbiddenException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class NotesService {
@@ -15,7 +15,7 @@ export class NotesService {
       data: {
         title,
         content,
-        userId, 
+        userId,
         tags: {
           connectOrCreate: tags?.map((tag) => ({
             where: { name: tag },
@@ -24,7 +24,7 @@ export class NotesService {
         },
       },
       include: {
-        tags: true, 
+        tags: true,
       },
     });
   }
@@ -47,13 +47,15 @@ export class NotesService {
       data: {
         title,
         content,
-        tags: tags ? {
-          set: [], 
-          connectOrCreate: tags.map((tag) => ({
-            where: { name: tag },
-            create: { name: tag },
-          })),
-        } : undefined,
+        tags: tags
+          ? {
+              set: [],
+              connectOrCreate: tags.map((tag) => ({
+                where: { name: tag },
+                create: { name: tag },
+              })),
+            }
+          : undefined,
       },
       include: { tags: true },
     });
@@ -71,20 +73,19 @@ export class NotesService {
     return `This action returns a #${id} note`;
   }
 
-
   async remove(id: string, userId: string) {
-      // 1. Verifica se existe/pertence
-      const note = await this.prisma.note.findFirst({
-        where: { id, userId },
-      });
+    // 1. Verifica se existe/pertence
+    const note = await this.prisma.note.findFirst({
+      where: { id, userId },
+    });
 
-      if (!note) {
-        throw new NotFoundException('Nota não encontrada ou acesso negado');
-      }
-
-      // 2. Deleta
-      return this.prisma.note.delete({
-        where: { id },
-      });
+    if (!note) {
+      throw new NotFoundException('Nota não encontrada ou acesso negado');
     }
+
+    // 2. Deleta
+    return this.prisma.note.delete({
+      where: { id },
+    });
+  }
 }

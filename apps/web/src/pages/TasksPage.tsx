@@ -1,12 +1,8 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
-import {
-  Task,
-  TaskList,
-  TaskCallbacks,
-  flattenTaskIds,
-} from "@/components/TaskItem";
+import { TaskList, type TaskCallbacks } from "@/components/TaskItem";
+import { flattenTaskIds, type Task } from "@/lib/task-tree";
 import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -180,7 +176,7 @@ export function TasksPage() {
     } finally {
       setCreating(false);
     }
-  }, [newTitle]);
+  }, [newTitle, newDueDate, newRecurring, newRecurrenceFrequency]);
 
   // ── INDENT ──
   const handleIndent = useCallback((taskId: string) => {
@@ -197,8 +193,8 @@ export function TasksPage() {
       tree = addChildToTask(tree, newParentId, movedTask);
 
       const newSiblingCount = (findInTree(tree, newParentId)?.task.children?.length ?? 1) - 1;
-      api.patch(`/tasks/${taskId}/move`, { parentId: newParentId, order: newSiblingCount }).catch(() => {
-        toast.error("Erro ao mover tarefa");
+      api.patch(`/tasks/${taskId}/move`, { parentId: newParentId, order: newSiblingCount }).catch((error) => {
+        toast.error(getApiErrorMessage(error, "Erro ao mover tarefa"));
         reloadTree();
       });
       return tree;
@@ -221,8 +217,8 @@ export function TasksPage() {
       const parentFound = findInTree(tree, parent.id);
       const parentIdx = parentFound ? parentFound.siblings.findIndex((t) => t.id === parent.id) : 0;
       // O item inserido logo após o pai fica em parentIdx + 1 (0-based), mas como já inserimos, basta informar
-      api.patch(`/tasks/${taskId}/move`, { parentId: grandparentId, order: parentIdx + 1 }).catch(() => {
-        toast.error("Erro ao mover tarefa");
+      api.patch(`/tasks/${taskId}/move`, { parentId: grandparentId, order: parentIdx + 1 }).catch((error) => {
+        toast.error(getApiErrorMessage(error, "Erro ao mover tarefa"));
         reloadTree();
       });
       return tree;
@@ -269,8 +265,8 @@ export function TasksPage() {
       tree = insertAtPosition(tree, newParentId, movedTask, overIndex);
 
       // 3. Persistir no backend
-      api.patch(`/tasks/${draggedId}/move`, { parentId: newParentId, order: overIndex }).catch(() => {
-        toast.error("Erro ao reordenar tarefa");
+      api.patch(`/tasks/${draggedId}/move`, { parentId: newParentId, order: overIndex }).catch((error) => {
+        toast.error(getApiErrorMessage(error, "Erro ao reordenar tarefa"));
         reloadTree();
       });
 

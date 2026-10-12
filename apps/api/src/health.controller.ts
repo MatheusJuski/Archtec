@@ -1,6 +1,9 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PrismaService } from './prisma/prisma.service';
 
+// Pings de monitoramento/keep-alive não contam no rate limit
+@SkipThrottle({ default: true, hourly: true })
 @Controller()
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}

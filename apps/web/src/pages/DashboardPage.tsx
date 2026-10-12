@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "motion/react";
-import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, CheckSquare, FileText } from "lucide-react";
+import { AlertTriangle, ArrowDownLeft, ArrowUpRight, CalendarClock, CheckSquare, FileText, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { TodayWidget } from "@/components/TodayWidget";
 import { PageHeader } from "@/components/ui/page-header";
 import { ShaderBackdrop } from "@/components/shader/ShaderBackdrop";
@@ -60,6 +61,84 @@ const ease = [0.22, 1, 0.36, 1] as const;
 
 const capitalizeFirst = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
 
+type Source = "events" | "tasks" | "summary" | "health";
+
+const SOURCE_LABELS: Record<Source, string> = {
+  events: "eventos",
+  tasks: "tarefas",
+  summary: "resumo financeiro",
+  health: "indicadores",
+};
+
+interface DashboardData {
+  key: number;
+  events: Event[] | null;
+  tasks: Task[] | null;
+  summary: TransactionsSummary | null;
+  health: HealthSummary | null;
+  failed: Source[];
+}
+
+/** Carrega cada fonte de forma independente: uma falha não apaga as outras. */
+async function loadDashboard(key: number): Promise<DashboardData> {
+  const [eventsRes, tasksRes, summaryRes, healthRes] = await Promise.allSettled([
+    api.get<Event[]>("/events"),
+    api.get<Task[]>("/tasks"),
+    api.get<TransactionsSummary>("/transactions/summary"),
+    api.get<HealthSummary>("/finance/health-summary"),
+  ]);
+
+  const failed: Source[] = [];
+  /** Resposta OK e no formato esperado; senão a fonte conta como falha (sem números falsos na tela). */
+  const take = <T,>(res: PromiseSettledResult<{ data: T }>, source: Source, isValid: (data: unknown) => boolean): T | null => {
+    if (res.status === "fulfilled" && isValid(res.value.data)) return res.value.data;
+    console.error(`Falha ao carregar ${source}`, res.status === "rejected" ? res.reason : res.value.data);
+    failed.push(source);
+    return null;
+  };
+
+  const rawSummary = take(summaryRes, "summary", (d) => isRecord(d) && isNumeric(d.balance) && isNumeric(d.month));
+  const rawHealth = take(healthRes, "health", (d) => isRecord(d) && isNumeric(d.tasksOverdue));
+
+  return {
+    key,
+    events: take(eventsRes, "events", Array.isArray),
+    tasks: take(tasksRes, "tasks", Array.isArray),
+    summary: rawSummary && {
+      month: rawSummary.month,
+      year: rawSummary.year,
+      income: Number(rawSummary.income),
+      expense: Number(rawSummary.expense),
+      balance: Number(rawSummary.balance),
+    },
+    health: rawHealth && {
+      ...rawHealth,
+      monthIncome: Number(rawHealth.monthIncome),
+      monthExpense: Number(rawHealth.monthExpense),
+      monthBalance: Number(rawHealth.monthBalance),
+      receivableOpen: Number(rawHealth.receivableOpen),
+      payableOpen: Number(rawHealth.payableOpen),
+    },
+    failed,
+  };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+// A API serializa decimais do Prisma como string: "123.45" também vale
+const isNumeric = (value: unknown) => value !== null && value !== "" && Number.isFinite(Number(value));
+
+function isSameDay(dateStr: string | null | undefined, day: Date) {
+  if (!dateStr) return false;
+  const date = new Date(dateStr);
+  return (
+    date.getFullYear() === day.getFullYear() &&
+    date.getMonth() === day.getMonth() &&
+    date.getDate() === day.getDate()
+  );
+}
+
 function DashboardSkeleton() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -77,57 +156,33 @@ function DashboardSkeleton() {
 }
 
 export function DashboardPage() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [summary, setSummary] = useState<TransactionsSummary | null>(null);
-  const [healthSummary, setHealthSummary] = useState<HealthSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  // Carregando enquanto o resultado em mãos não for o da tentativa atual
+  const loading = data?.key !== reloadKey;
 
   useEffect(() => {
-    Promise.all([
-      api.get("/events"),
-      api.get("/tasks"),
-      api.get<TransactionsSummary>("/transactions/summary"),
-      api.get<HealthSummary>("/finance/health-summary"),
-    ])
-      .then(([eventsRes, tasksRes, summaryRes, healthRes]) => {
-        setEvents(eventsRes.data);
-        setTasks(tasksRes.data);
-        setSummary({
-          month: summaryRes.data.month,
-          year: summaryRes.data.year,
-          income: Number(summaryRes.data.income),
-          expense: Number(summaryRes.data.expense),
-          balance: Number(summaryRes.data.balance),
-        });
-        setHealthSummary({
-          ...healthRes.data,
-          monthIncome: Number(healthRes.data.monthIncome),
-          monthExpense: Number(healthRes.data.monthExpense),
-          monthBalance: Number(healthRes.data.monthBalance),
-          receivableOpen: Number(healthRes.data.receivableOpen),
-          payableOpen: Number(healthRes.data.payableOpen),
-        });
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    let cancelled = false;
+    loadDashboard(reloadKey).then((result) => {
+      if (!cancelled) setData(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
-  // Filtra eventos e tarefas para hoje
+  const events = data?.events ?? null;
+  const tasks = data?.tasks ?? null;
+  const summary = data?.summary ?? null;
+  const healthSummary = data?.health ?? null;
+  const failed = data?.failed ?? [];
+
   const today = useMemo(() => new Date(), []);
-  function isToday(dateStr?: string | null) {
-    if (!dateStr) return false;
-    const date = new Date(dateStr);
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  }
 
   const todayEvents = useMemo(
     () =>
-      events
-        .filter((e) => isToday(e.start))
+      (events ?? [])
+        .filter((e) => isSameDay(e.start, today))
         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
         .map((e) => ({ id: e.id, title: e.title, time: new Date(e.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })),
     [events, today]
@@ -135,35 +190,42 @@ export function DashboardPage() {
 
   const todayTasks = useMemo(
     () =>
-      tasks
-        .filter((t) => isToday(t.dueDate))
+      (tasks ?? [])
+        .filter((t) => isSameDay(t.dueDate, today))
         .map((t) => ({ id: t.id, title: t.title })),
     [tasks, today]
   );
 
   const financialSummary = summary ?? {
-    month: new Date().getMonth() + 1,
-    year: new Date().getFullYear(),
+    month: today.getMonth() + 1,
+    year: today.getFullYear(),
     income: 0,
     expense: 0,
     balance: 0,
   };
 
-  const monthLabel = monthFormatter.format(
-    new Date(financialSummary.year, financialSummary.month - 1, 1)
-  );
+  // Se a API devolver mês/ano inválidos, cai no mês atual em vez de quebrar a tela
+  const summaryMonth = new Date(financialSummary.year, financialSummary.month - 1, 1);
+  const monthLabel = monthFormatter.format(Number.isNaN(summaryMonth.getTime()) ? today : summaryMonth);
   const isPositiveBalance = financialSummary.balance >= 0;
 
   const flow = financialSummary.income + financialSummary.expense;
   const incomeShare = flow > 0 ? (financialSummary.income / flow) * 100 : 50;
 
+  // Sem dado não mostramos 0 (que pareceria real): mostramos "—"
+  const UNAVAILABLE = "—";
+  const money = (value: number | undefined, available: boolean) =>
+    available && value !== undefined ? currencyFormatter.format(value) : UNAVAILABLE;
+  const hasSummary = summary !== null;
+  const hasHealth = healthSummary !== null;
+
   const stats = [
-    { label: "Tarefas vencidas", value: healthSummary?.tasksOverdue ?? 0, tone: (healthSummary?.tasksOverdue ?? 0) > 0 ? "danger" : "default", icon: <AlertTriangle /> },
-    { label: "Tarefas para hoje", value: healthSummary?.tasksDueToday ?? todayTasks.length, tone: "brand", icon: <CheckSquare /> },
-    { label: "Eventos hoje", value: healthSummary?.eventsToday ?? todayEvents.length, tone: "default", icon: <CalendarClock /> },
-    { label: "Notas totais", value: healthSummary?.notesTotal ?? 0, tone: "default", icon: <FileText /> },
-    { label: "A receber em aberto", value: currencyFormatter.format(healthSummary?.receivableOpen ?? 0), tone: "success", icon: <ArrowDownLeft /> },
-    { label: "A pagar em aberto", value: currencyFormatter.format(healthSummary?.payableOpen ?? 0), tone: "signal", icon: <ArrowUpRight /> },
+    { label: "Tarefas vencidas", value: hasHealth ? healthSummary.tasksOverdue : UNAVAILABLE, tone: (healthSummary?.tasksOverdue ?? 0) > 0 ? "danger" : "default", icon: <AlertTriangle /> },
+    { label: "Tarefas para hoje", value: healthSummary?.tasksDueToday ?? (tasks ? todayTasks.length : UNAVAILABLE), tone: "brand", icon: <CheckSquare /> },
+    { label: "Eventos hoje", value: healthSummary?.eventsToday ?? (events ? todayEvents.length : UNAVAILABLE), tone: "default", icon: <CalendarClock /> },
+    { label: "Notas totais", value: hasHealth ? healthSummary.notesTotal : UNAVAILABLE, tone: "default", icon: <FileText /> },
+    { label: "A receber em aberto", value: money(healthSummary?.receivableOpen, hasHealth), tone: "success", icon: <ArrowDownLeft /> },
+    { label: "A pagar em aberto", value: money(healthSummary?.payableOpen, hasHealth), tone: "signal", icon: <ArrowUpRight /> },
   ] as const;
 
   return (
@@ -174,6 +236,23 @@ export function DashboardPage() {
           title="Visão geral"
           description={capitalizeFirst(dayFormatter.format(today))}
         />
+
+        {!loading && failed.length > 0 && (
+          <div
+            role="alert"
+            className="mb-6 flex flex-wrap items-center gap-3 border border-destructive border-l-[3px] bg-destructive/5 px-4 py-3"
+          >
+            <AlertTriangle className="size-4 shrink-0 text-destructive" />
+            <p className="min-w-0 flex-1 text-sm">
+              {failed.length === 4
+                ? "Não foi possível carregar o painel. Verifique sua conexão."
+                : `Não foi possível carregar: ${failed.map((f) => SOURCE_LABELS[f]).join(", ")}. O restante está atualizado.`}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCw /> Tentar novamente
+            </Button>
+          </div>
+        )}
 
         {loading ? (
           <DashboardSkeleton />
@@ -195,11 +274,15 @@ export function DashboardPage() {
                     </div>
                     <div>
                       <p className="font-mono text-[clamp(2.25rem,6vw,4rem)] font-medium leading-none tracking-[-0.04em] tabular-nums">
-                        {currencyFormatter.format(financialSummary.balance)}
+                        {money(financialSummary.balance, hasSummary)}
                       </p>
                       <p className="mt-3 flex items-center gap-2 text-sm text-white/75">
-                        <span className={isPositiveBalance ? "size-2 bg-success" : "size-2 bg-destructive"} />
-                        {isPositiveBalance ? "No azul este mês." : "Gastos acima das receitas este mês."}
+                        <span className={!hasSummary ? "size-2 bg-white/50" : isPositiveBalance ? "size-2 bg-success" : "size-2 bg-destructive"} />
+                        {!hasSummary
+                          ? "Resumo financeiro indisponível no momento."
+                          : isPositiveBalance
+                            ? "No azul este mês."
+                            : "Gastos acima das receitas este mês."}
                       </p>
                     </div>
                   </div>
@@ -221,13 +304,13 @@ export function DashboardPage() {
                       <p className="label-tech flex items-center gap-2 text-muted-foreground">
                         <span className="size-2 bg-success" /> Receitas
                       </p>
-                      <p className="mt-2 font-mono text-xl tabular-nums">{currencyFormatter.format(financialSummary.income)}</p>
+                      <p className="mt-2 font-mono text-xl tabular-nums">{money(financialSummary.income, hasSummary)}</p>
                     </div>
                     <div className="text-right">
                       <p className="label-tech flex items-center justify-end gap-2 text-muted-foreground">
                         Despesas <span className="hatch hatch-signal size-2 border border-signal" />
                       </p>
-                      <p className="mt-2 font-mono text-xl tabular-nums">{currencyFormatter.format(financialSummary.expense)}</p>
+                      <p className="mt-2 font-mono text-xl tabular-nums">{money(financialSummary.expense, hasSummary)}</p>
                     </div>
                   </div>
                 </div>
@@ -256,7 +339,7 @@ export function DashboardPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, ease, delay: 0.1 }}
             >
-              <TodayWidget events={todayEvents} tasks={todayTasks} />
+              <TodayWidget events={todayEvents} tasks={todayTasks} unavailable={events === null || tasks === null} />
             </motion.div>
           </div>
         )}

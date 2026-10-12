@@ -1,10 +1,15 @@
 import { Extension } from '@tiptap/core'
 import Suggestion from '@tiptap/suggestion'
-import { ReactRenderer } from '@tiptap/react'
 import { PluginKey } from '@tiptap/pm/state'
-import tippy from 'tippy.js'
 import { FileText, Landmark, ListChecks } from 'lucide-react'
-import { forwardRef, useEffect, useImperativeHandle, useState } from 'react'
+import { forwardRef } from 'react'
+import {
+  createSuggestionOptions,
+  useSuggestionKeyboard,
+  type SuggestionItem,
+  type SuggestionListHandle,
+  type SuggestionListProps,
+} from './suggestion-popup'
 
 import { api } from '@/lib/api'
 
@@ -38,6 +43,8 @@ interface MentionCandidate {
   href: string
 }
 
+type MentionItem = MentionCandidate & SuggestionItem
+
 const NOTE_CACHE_TTL_MS = 15000
 let noteCache: NoteOption[] = []
 let noteCacheLoadedAt = 0
@@ -55,7 +62,7 @@ async function loadNotes() {
   const response = await api.get<NoteOption[]>('/notes')
   noteCache = response.data.map((note) => ({
     id: note.id,
-    title: note.title || 'Sem titulo',
+    title: note.title || 'Sem título',
     content: note.content || '',
   }))
   noteCacheLoadedAt = now
@@ -71,7 +78,7 @@ async function loadTasks() {
   const response = await api.get<TaskOption[]>('/tasks')
   taskCache = response.data.map((task) => ({
     id: task.id,
-    title: task.title || 'Tarefa sem titulo',
+    title: task.title || 'Tarefa sem título',
     description: task.description || null,
   }))
   taskCacheLoadedAt = now
@@ -148,13 +155,13 @@ async function getMentionItems({ query }: { query: string }) {
       )
     })
     .slice(0, 8)
-    .map((item) => ({
+    .map((item): MentionItem => ({
       ...item,
       icon:
         item.type === 'note' ? <FileText size={16} /> :
         item.type === 'task' ? <ListChecks size={16} /> :
         <Landmark size={16} />,
-      command: ({ editor, range }: any) => {
+      command: ({ editor, range }) => {
         editor
           .chain()
           .focus()
@@ -182,50 +189,15 @@ async function getMentionItems({ query }: { query: string }) {
     }))
 }
 
-const MentionList = forwardRef((props: any, ref) => {
-  const [selectedIndex, setSelectedIndex] = useState(0)
-
-  const selectItem = (index: number) => {
-    const item = props.items[index]
-    if (item) {
-      props.command(item)
-    }
-  }
-
-  useEffect(() => {
-    setSelectedIndex(0)
-  }, [props.items])
-
-  useImperativeHandle(ref, () => ({
-    onKeyDown: ({ event }: { event: KeyboardEvent }) => {
-      const itemCount = props.items.length
-      if (itemCount === 0) return false
-
-      if (event.key === 'ArrowUp') {
-        setSelectedIndex((selectedIndex + itemCount - 1) % itemCount)
-        return true
-      }
-
-      if (event.key === 'ArrowDown') {
-        setSelectedIndex((selectedIndex + 1) % itemCount)
-        return true
-      }
-
-      if (event.key === 'Enter') {
-        selectItem(selectedIndex)
-        return true
-      }
-
-      return false
-    },
-  }))
+const MentionList = forwardRef<SuggestionListHandle, SuggestionListProps<MentionItem>>((props, ref) => {
+  const { selectedIndex, selectItem } = useSuggestionKeyboard(props.items, props.command, ref)
 
   return (
     <div className="min-w-64 overflow-hidden border border-ink bg-popover p-1 text-popover-foreground shadow-[3px_3px_0_0_var(--ink)]">
       {props.items.length ? (
-        props.items.map((item: any, index: number) => (
+        props.items.map((item, index) => (
           <button
-            key={item.id}
+            key={`${item.type}:${item.id}`}
             className={`flex w-full items-start gap-3 px-2.5 py-2 text-left text-sm transition-colors ${
               index === selectedIndex
                 ? 'bg-ink text-surface-1'
@@ -246,7 +218,7 @@ const MentionList = forwardRef((props: any, ref) => {
           </button>
         ))
       ) : (
-        <div className="label-tech px-3 py-3 text-muted-foreground">Nenhuma nota encontrada</div>
+        <div className="label-tech px-3 py-3 text-muted-foreground">Nada encontrado</div>
       )}
     </div>
   )
@@ -257,69 +229,14 @@ MentionList.displayName = 'MentionList'
 export const NoteMention = Extension.create({
   name: 'noteMention',
 
-  addOptions() {
-    return {
-      suggestion: {
-        pluginKey: new PluginKey('noteMentionSuggestion'),
-        char: '@',
-        command: ({ editor, range, props }: any) => {
-          props.command({ editor, range })
-        },
-        render: () => {
-          let component: any
-          let popup: any
-
-          return {
-            onStart: (props: any) => {
-              component = new ReactRenderer(MentionList, {
-                props,
-                editor: props.editor,
-              })
-
-              if (!props.clientRect) {
-                return
-              }
-
-              popup = tippy('body', {
-                getReferenceClientRect: props.clientRect,
-                appendTo: () => document.body,
-                content: component.element,
-                showOnCreate: true,
-                interactive: true,
-                trigger: 'manual',
-                placement: 'bottom-start',
-              })
-            },
-            onUpdate(props: any) {
-              component.updateProps(props)
-              if (!props.clientRect) return
-              popup[0].setProps({
-                getReferenceClientRect: props.clientRect,
-              })
-            },
-            onKeyDown(props: any) {
-              if (props.event.key === 'Escape') {
-                popup[0].hide()
-                return true
-              }
-              return component.ref?.onKeyDown(props)
-            },
-            onExit() {
-              popup[0].destroy()
-              component.destroy()
-            },
-          }
-        },
-      },
-    }
-  },
-
   addProseMirrorPlugins() {
     return [
       Suggestion({
         editor: this.editor,
-        ...this.options.suggestion,
-        items: getMentionItems,
+        ...createSuggestionOptions(
+          { pluginKey: new PluginKey('noteMentionSuggestion'), char: '@', items: getMentionItems },
+          MentionList,
+        ),
       }),
     ]
   },

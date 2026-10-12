@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api";
+import { api, getApiErrorMessage } from "@/lib/api";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +13,6 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
-  DragCancelEvent,
   PointerSensor,
   pointerWithin,
   useDraggable,
@@ -203,13 +202,6 @@ function dateToFormParts(date: Date) {
     date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
     time: `${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
   };
-}
-
-function extractApiErrorMessage(error: any, fallback: string) {
-  const message = error?.response?.data?.message;
-  if (Array.isArray(message)) return message[0] ?? fallback;
-  if (typeof message === "string" && message.trim().length > 0) return message;
-  return fallback;
 }
 
 function flattenTasks(tasks: TaskFromApi[], level = 0): FlatTask[] {
@@ -487,7 +479,7 @@ export function CalendarPage() {
     });
   }
 
-  function handleDragCancel(_event: DragCancelEvent) {
+  function handleDragCancel() {
     setActiveDragTask(null);
   }
 
@@ -524,8 +516,8 @@ export function CalendarPage() {
     try {
       await createEventFromTaskDrop(draggedTask, start);
       toast.success(`Timeblock criado para: ${draggedTask.title}`);
-    } catch (error: any) {
-      toast.error(extractApiErrorMessage(error, "Erro ao criar timeblock da tarefa"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao criar timeblock da tarefa"));
     } finally {
       setIsSaving(false);
     }
@@ -588,8 +580,8 @@ export function CalendarPage() {
       setIsCreateDialogOpen(false);
       form.reset();
       toast.success("Evento criado com sucesso");
-    } catch (error: any) {
-      toast.error(extractApiErrorMessage(error, "Erro ao criar evento"));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao criar evento"));
     } finally {
       setIsSaving(false);
     }

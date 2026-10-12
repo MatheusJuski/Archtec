@@ -1,23 +1,36 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { UpdateNoteDto } from './dto/update-note.dto';
-import { JwtAuthGuard } from '../auth/jwt-auth.guard'; 
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ParseUUIDPipe } from '@nestjs/common';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('notes')
-@UseGuards(JwtAuthGuard) 
+@UseGuards(JwtAuthGuard)
 export class NotesController {
   constructor(private readonly notesService: NotesService) {}
 
   @Post()
-  create(@Request() req, @Body() createNoteDto: CreateNoteDto) {
-    const userId = req.user.id || req.user.userId;
+  create(
+    @Request() req: AuthenticatedRequest,
+    @Body() createNoteDto: CreateNoteDto,
+  ) {
     return this.notesService.create(req.user.userId, createNoteDto);
   }
 
   @Get()
-  findAll(@Request() req) {
+  findAll(@Request() req: AuthenticatedRequest) {
     return this.notesService.findAll(req.user.userId);
   }
 
@@ -26,19 +39,19 @@ export class NotesController {
     return this.notesService.findOne(+id);
   }
 
-@Patch(':id')
+  @Patch(':id')
   update(
-    @Request() req,
+    @Request() req: AuthenticatedRequest,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() updateNoteDto: UpdateNoteDto,
   ) {
     return this.notesService.update(id, req.user.userId, updateNoteDto);
   }
 
-@Delete(':id')
+  @Delete(':id')
   remove(
-    @Request() req, 
-    @Param('id', ParseUUIDPipe) id: string
+    @Request() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.notesService.remove(id, req.user.userId);
   }

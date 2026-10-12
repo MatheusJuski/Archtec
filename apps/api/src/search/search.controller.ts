@@ -1,6 +1,14 @@
-import { BadRequestException, Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Controller,
+  Get,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { SearchService } from './search.service';
+import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('search')
 @UseGuards(JwtAuthGuard)
@@ -8,7 +16,7 @@ export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Get()
-  search(@Request() req, @Query('q') q?: string) {
+  search(@Request() req: AuthenticatedRequest, @Query('q') q?: string) {
     const query = q?.trim() ?? '';
 
     if (query.length === 0) {
@@ -16,7 +24,9 @@ export class SearchController {
     }
 
     if (query.length < 2) {
-      throw new BadRequestException('A busca precisa ter ao menos 2 caracteres');
+      throw new BadRequestException(
+        'A busca precisa ter ao menos 2 caracteres',
+      );
     }
 
     return this.searchService.searchAll(req.user.userId, query);

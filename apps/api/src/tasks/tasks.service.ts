@@ -1,4 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export interface TaskWithChildren {
@@ -22,7 +26,10 @@ export interface TaskWithChildren {
 export class TasksService {
   constructor(private prisma: PrismaService) {}
 
-  private addRecurrenceDate(source: Date, recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY') {
+  private addRecurrenceDate(
+    source: Date,
+    recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY',
+  ) {
     const next = new Date(source);
     switch (recurrenceFrequency) {
       case 'DAILY':
@@ -42,7 +49,6 @@ export class TasksService {
     return next;
   }
 
-
   async findAll(userId: string, tree = false): Promise<TaskWithChildren[]> {
     const tasks = await this.prisma.task.findMany({
       where: { userId },
@@ -56,8 +62,6 @@ export class TasksService {
     return this.buildTree(tasks);
   }
 
-
-
   async createTask(
     userId: string,
     data: {
@@ -68,6 +72,7 @@ export class TasksService {
       recurrenceFrequency?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY' | null;
     },
   ) {
+    await this.assertValidParent(userId, data.parentId ?? null);
     const count = await this.prisma.task.count({ where: { userId } });
     return this.prisma.task.create({
       data: {
@@ -76,10 +81,51 @@ export class TasksService {
         parentId: data.parentId ?? null,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
         isRecurring: data.isRecurring ?? false,
-        recurrenceFrequency: data.isRecurring ? (data.recurrenceFrequency ?? 'MONTHLY') : null,
+        recurrenceFrequency: data.isRecurring
+          ? (data.recurrenceFrequency ?? 'MONTHLY')
+          : null,
         order: count,
       },
     });
+  }
+
+  /**
+   * O pai precisa ser uma tarefa do próprio usuário e, ao mover, não pode ser a própria
+   * tarefa nem uma descendente dela (isso criaria um ciclo e sumiria com o ramo da árvore).
+   */
+  private async assertValidParent(
+    userId: string,
+    parentId: string | null,
+    taskId?: string,
+  ) {
+    if (!parentId) return;
+    if (parentId === taskId) {
+      throw new BadRequestException(
+        'Uma tarefa não pode ser subtarefa de si mesma',
+      );
+    }
+
+    let currentId: string | null = parentId;
+    const visited = new Set<string>();
+    while (currentId) {
+      if (visited.has(currentId)) break; // proteção contra dados já corrompidos
+      visited.add(currentId);
+
+      const node: { parentId: string | null } | null =
+        await this.prisma.task.findFirst({
+          where: { id: currentId, userId },
+          select: { parentId: true },
+        });
+      if (!node) {
+        throw new NotFoundException('Tarefa pai não encontrada');
+      }
+      if (taskId && node.parentId === taskId) {
+        throw new BadRequestException(
+          'Não é possível mover uma tarefa para dentro de uma subtarefa dela',
+        );
+      }
+      currentId = node.parentId;
+    }
   }
 
   async moveTask(
@@ -88,6 +134,15 @@ export class TasksService {
     parentId: string | null,
     order?: number,
   ) {
+    const existing = await this.prisma.task.findFirst({
+      where: { id: taskId, userId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Tarefa não encontrada');
+    }
+    await this.assertValidParent(userId, parentId, taskId);
+
     const task = await this.prisma.task.update({
       where: { id: taskId, userId },
       data: { parentId },
@@ -152,8 +207,15 @@ export class TasksService {
       WHERE id IN (SELECT id FROM descendants)
     `;
 
-    if (currentTask.isRecurring && currentTask.dueDate && currentTask.recurrenceFrequency) {
-      const nextDueDate = this.addRecurrenceDate(currentTask.dueDate, currentTask.recurrenceFrequency);
+    if (
+      currentTask.isRecurring &&
+      currentTask.dueDate &&
+      currentTask.recurrenceFrequency
+    ) {
+      const nextDueDate = this.addRecurrenceDate(
+        currentTask.dueDate,
+        currentTask.recurrenceFrequency,
+      );
 
       const alreadyExists = await this.prisma.task.findFirst({
         where: {
@@ -163,8 +225,24 @@ export class TasksService {
           isRecurring: true,
           recurrenceFrequency: currentTask.recurrenceFrequency,
           dueDate: {
-            gte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate(), 0, 0, 0, 0),
-            lt: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), nextDueDate.getDate() + 1, 0, 0, 0, 0),
+            gte: new Date(
+              nextDueDate.getFullYear(),
+              nextDueDate.getMonth(),
+              nextDueDate.getDate(),
+              0,
+              0,
+              0,
+              0,
+            ),
+            lt: new Date(
+              nextDueDate.getFullYear(),
+              nextDueDate.getMonth(),
+              nextDueDate.getDate() + 1,
+              0,
+              0,
+              0,
+              0,
+            ),
           },
         },
         select: { id: true },

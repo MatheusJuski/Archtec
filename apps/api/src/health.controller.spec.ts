@@ -18,11 +18,16 @@ describe('HealthController', () => {
 
   it('check reporta banco up quando a consulta funciona', async () => {
     prismaMock.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
-    await expect(controller.check()).resolves.toMatchObject({ status: 'ok', database: 'up' });
+    await expect(controller.check()).resolves.toMatchObject({
+      status: 'ok',
+      database: 'up',
+    });
   });
 
   it('check lança 503 quando o banco falha', async () => {
     prismaMock.$queryRaw.mockRejectedValue(new Error('down'));
-    await expect(controller.check()).rejects.toBeInstanceOf(ServiceUnavailableException);
+    await expect(controller.check()).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
   });
 });

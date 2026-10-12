@@ -1,17 +1,19 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Coffee } from "lucide-react";
+import { AlertTriangle, Coffee } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 
 interface TodayWidgetProps {
   events: Array<{ id: string; title: string; time: string }>;
   tasks: Array<{ id: string; title: string }>;
+  /** Eventos ou tarefas não carregaram: não afirmar que o dia está livre */
+  unavailable?: boolean;
 }
 
-export const TodayWidget: React.FC<TodayWidgetProps> = ({ events, tasks }) => {
+export const TodayWidget: React.FC<TodayWidgetProps> = ({ events, tasks, unavailable }) => {
   const hasEvents = events && events.length > 0;
   const hasTasks = tasks && tasks.length > 0;
-  const isEmpty = !hasEvents && !hasTasks;
+  const isEmpty = !hasEvents && !hasTasks && !unavailable;
 
   return (
     <Panel
@@ -47,6 +49,13 @@ export const TodayWidget: React.FC<TodayWidgetProps> = ({ events, tasks }) => {
           <Link to="/tasks" className="label-tech mt-3 inline-block text-brand hover:underline">
             Ver todas →
           </Link>
+        </div>
+      )}
+      {unavailable && (
+        <div className="m-4 flex flex-col items-center gap-2 border border-dashed border-destructive/60 px-4 py-8 text-center">
+          <AlertTriangle className="h-5 w-5 text-destructive" />
+          <p className="text-sm font-medium">Agenda indisponível</p>
+          <p className="text-xs text-muted-foreground">Não conseguimos carregar todos os eventos e tarefas de hoje.</p>
         </div>
       )}
       {isEmpty && (

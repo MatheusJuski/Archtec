@@ -1,4 +1,4 @@
-# Architec (Life OS)
+# Archtec (Life OS)
 
 Um “Segundo Cérebro” digital. Sistema integrado para gestão de conhecimento, execução de projetos e controle financeiro, unificando múltiplos domínios da vida pessoal em uma única arquitetura de software.
 
@@ -6,7 +6,7 @@ Um “Segundo Cérebro” digital. Sistema integrado para gestão de conheciment
 
 ## Visão Geral
 
-O Architec é um ERP pessoal, projetado para resolver a fragmentação da vida digital.
+O Archtec é um ERP pessoal, projetado para resolver a fragmentação da vida digital.
 
 Em vez de usar ferramentas separadas:
 
@@ -14,7 +14,7 @@ Em vez de usar ferramentas separadas:
 - **Todoist** → tarefas  
 - **Excel** → finanças  
 
-O Architec unifica esses domínios por meio de um modelo de dados relacional robusto, onde informação, execução e recursos financeiros se conectam.
+O Archtec unifica esses domínios por meio de um modelo de dados relacional robusto, onde informação, execução e recursos financeiros se conectam.
 
 Este projeto está em desenvolvimento como exercício de engenharia de software, simulando desafios reais encontrados em sistemas de mercado.
 
@@ -67,6 +67,52 @@ O backend é responsável por proteger a lógica do sistema, evitando que regras
 - PostgreSQL — Banco de dados relacional  
 - Prisma ORM — Acesso type-safe ao banco  
 - Docker — Containerização do ambiente  
+- Helmet + @nestjs/throttler — Headers de segurança e rate limit por IP  
+
+### Frontend
+- React (Vite) — UI moderna e performática  
+- TypeScript — Tipagem estática e segurança  
+- TailwindCSS + Shadcn/ui — Design system e componentes  
+- Zustand — Gerenciamento de estado leve  
+- Motion — Animações e transições de interface  
+- Shaders (WebGPU) — Fundos animados, com fallback em CSS  
+
+---
+
+## Desenvolvimento Local
+
+Pré-requisitos: Node.js 24+ e Docker.
+
+```bash
+# 1. Banco de dados
+docker compose up -d
+
+# 2. API (porta 3333)
+cd apps/api
+cp .env.example .env
+npm install
+npx prisma migrate deploy
+npm run start:dev
+
+# 3. Frontend (porta 5173)
+cd apps/web
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Detalhes de cada app: [apps/api/README.md](apps/api/README.md) e [apps/web/README.md](apps/web/README.md).
+
+---
+
+## Segurança e Qualidade
+
+- **Rate limit por IP** na API: limite geral e um limite mais rígido em login, cadastro e Google, contra força bruta.  
+- **Headers de segurança** com Helmet.  
+- **Isolamento por usuário**: toda leitura e escrita é filtrada pelo dono do registro.  
+- **Sessão**: token JWT com expiração; ao expirar, o usuário é avisado e notas não salvas ficam como rascunho local.  
+- **Erros visíveis**: o frontend nunca mostra dado falso (ex.: saldo zerado) quando uma requisição falha.  
+- **CI** (GitHub Actions): lint, formatação, typecheck, testes e build da API e do frontend a cada push e pull request.  
 
 ---
 
@@ -139,12 +185,6 @@ cp apps/web/.env.example apps/web/.env
 
 4. Suba backend e frontend. O botão Google aparece automaticamente na tela de login quando `VITE_GOOGLE_CLIENT_ID` estiver definido.
 
-### Frontend
-- React (Vite) — UI moderna e performática  
-- TypeScript — Tipagem estática e segurança  
-- TailwindCSS + Shadcn/ui — Design system e componentes  
-- Zustand — Gerenciamento de estado leve  
-
 ---
 
 ## Módulos do Sistema
@@ -184,7 +224,7 @@ O projeto está em desenvolvimento contínuo, com foco em:
 
 ## Por que este projeto existe?
 
-Este repositório faz parte do meu portfólio como engenheiro de software. Grande parte dos sistemas que desenvolvo profissionalmente são privados, então o Architec foi criado para demonstrar:
+Este repositório faz parte do meu portfólio como engenheiro de software. Grande parte dos sistemas que desenvolvo profissionalmente são privados, então o Archtec foi criado para demonstrar:
 
 - Capacidade de modelar sistemas complexos  
 - Organização arquitetural  

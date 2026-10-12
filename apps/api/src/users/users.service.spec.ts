@@ -31,7 +31,10 @@ describe('UsersService', () => {
       sign: jest.fn(),
     };
 
-    service = new UsersService(prismaMock as unknown as PrismaService, jwtServiceMock as unknown as JwtService);
+    service = new UsersService(
+      prismaMock as unknown as PrismaService,
+      jwtServiceMock as unknown as JwtService,
+    );
   });
 
   afterEach(() => {

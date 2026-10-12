@@ -24,7 +24,10 @@ export enum CreateTransactionRecurrenceFrequency {
 }
 
 export class CreateTransactionDto {
-  @IsNumber({ allowInfinity: false, allowNaN: false }, { message: 'Valor inválido' })
+  @IsNumber(
+    { allowInfinity: false, allowNaN: false },
+    { message: 'Valor inválido' },
+  )
   @Min(0.01, { message: 'Valor deve ser maior que zero' })
   amount: number;
 
@@ -40,7 +43,9 @@ export class CreateTransactionDto {
   description?: string;
 
   @IsOptional()
-  @IsHexColor({ message: 'categoryColor deve ser uma cor hexadecimal válida (#RRGGBB)' })
+  @IsHexColor({
+    message: 'categoryColor deve ser uma cor hexadecimal válida (#RRGGBB)',
+  })
   categoryColor?: string;
 
   @IsOptional()
@@ -53,7 +58,8 @@ export class CreateTransactionDto {
 
   @ValidateIf((o: CreateTransactionDto) => o.isRecurring === true)
   @IsEnum(CreateTransactionRecurrenceFrequency, {
-    message: 'recurrenceFrequency deve ser DAILY, WEEKLY, MONTHLY ou YEARLY quando recorrente',
+    message:
+      'recurrenceFrequency deve ser DAILY, WEEKLY, MONTHLY ou YEARLY quando recorrente',
   })
   recurrenceFrequency?: CreateTransactionRecurrenceFrequency;
 }

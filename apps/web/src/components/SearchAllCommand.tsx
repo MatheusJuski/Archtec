@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom"
 import { CalendarDays, FileText, ListChecks, Search } from "lucide-react"
 
 import { api } from "@/lib/api"
+import { OPEN_SEARCH_EVENT } from "@/lib/events"
 import {
   CommandDialog,
   CommandEmpty,
@@ -42,8 +43,14 @@ export function SearchAllCommand() {
       setOpen((prev) => !prev)
     }
 
+    const onOpenRequest = () => setOpen(true)
+
     window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest)
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+      window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest)
+    }
   }, [])
 
   useEffect(() => {
