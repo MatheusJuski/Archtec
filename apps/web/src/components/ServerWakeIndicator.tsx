@@ -6,6 +6,16 @@ import { api } from "@/lib/api";
 // Abaixo disso a API respondeu rápido o bastante para não valer mostrar aviso
 const SLOW_AFTER_MS = 1500;
 const RETRY_MS = 4000;
+// Teto: se nada responder até aqui (ex.: ping barrado por extensão), some com o aviso
+const GIVE_UP_MS = 90_000;
+
+// Rota sem "health" no nome: bloqueadores de anúncio barram esse padrão (ERR_BLOCKED_BY_CLIENT)
+const PING_PATH = "/up";
+
+/** Qualquer resposta HTTP prova que o servidor está de pé; 502/503/504 vêm do proxy enquanto ele sobe. */
+function serverAnswered(status: number | undefined) {
+  return status !== undefined && ![502, 503, 504].includes(status);
+}
 
 type Status = "checking" | "waking" | "online" | "idle";
 
@@ -25,11 +35,20 @@ export function ServerWakeIndicator() {
     const tick = window.setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
     let retryTimer: number | undefined;
     let hideTimer: number | undefined;
+    let done = false;
+
+    const stop = () => {
+      done = true;
+      window.clearTimeout(slowTimer);
+      window.clearTimeout(retryTimer);
+      window.clearTimeout(giveUpTimer);
+      window.clearInterval(tick);
+      api.interceptors.response.eject(interceptorId);
+    };
 
     const markOnline = () => {
-      if (cancelled) return;
-      window.clearTimeout(slowTimer);
-      window.clearInterval(tick);
+      if (cancelled || done) return;
+      stop();
       setStatus((prev) => {
         if (prev === "waking") {
           hideTimer = window.setTimeout(() => !cancelled && setStatus("idle"), 2000);
@@ -39,30 +58,39 @@ export function ServerWakeIndicator() {
       });
     };
 
+    // Qualquer outra chamada da API que responder (login, notas…) também prova que acordou,
+    // mesmo que o próprio ping tenha sido bloqueado no navegador.
+    const interceptorId = api.interceptors.response.use(
+      (response) => {
+        markOnline();
+        return response;
+      },
+      (error) => {
+        if (serverAnswered(error?.response?.status)) markOnline();
+        return Promise.reject(error);
+      },
+    );
+
+    const giveUpTimer = window.setTimeout(() => {
+      if (cancelled || done) return;
+      stop();
+      setStatus("idle");
+    }, GIVE_UP_MS);
+
     const ping = () => {
       api
-        .get("/health/live", { timeout: 70_000 })
-        .then(markOnline)
-        .catch((error) => {
-          if (cancelled) return;
-          const status: number | undefined = error?.response?.status;
-          // Qualquer resposta HTTP (ex.: 404 numa API sem /health/live) prova que o servidor
-          // está de pé. Só erro de rede ou 502/503/504 do proxy significam "ainda acordando".
-          if (status !== undefined && ![502, 503, 504].includes(status)) {
-            markOnline();
-            return;
-          }
-          retryTimer = window.setTimeout(ping, RETRY_MS);
+        .get(PING_PATH, { timeout: 70_000 })
+        .catch(() => {
+          // markOnline já foi chamado pelo interceptor se houve resposta; senão tenta de novo
+          if (!cancelled && !done) retryTimer = window.setTimeout(ping, RETRY_MS);
         });
     };
     ping();
 
     return () => {
       cancelled = true;
-      window.clearTimeout(slowTimer);
-      window.clearTimeout(retryTimer);
+      stop();
       window.clearTimeout(hideTimer);
-      window.clearInterval(tick);
     };
   }, []);
 

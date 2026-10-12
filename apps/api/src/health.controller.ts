@@ -1,20 +1,21 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from './prisma/prisma.service';
 
-@Controller('health')
+@Controller()
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Liveness sem tocar no banco: usado pelo ping externo para manter a API acordada
-   * sem impedir o Postgres (Neon) de hibernar.
+   * Liveness sem tocar no banco: mantém a API acordada sem impedir o Postgres (Neon) de hibernar.
+   * - /health/live: usado pelo ping externo (cron).
+   * - /up: usado pelo frontend; nome neutro porque bloqueadores de anúncio barram URLs com "health".
    */
-  @Get('live')
+  @Get(['health/live', 'up'])
   live() {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
 
-  @Get()
+  @Get('health')
   async check() {
     try {
       await this.prisma.$queryRaw`SELECT 1`;
