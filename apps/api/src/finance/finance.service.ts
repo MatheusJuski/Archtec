@@ -1,12 +1,16 @@
 import { Prisma } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { TransactionsService } from '../transactions/transactions.service';
 import { CreateAccountEntryDto } from './dto/create-account-entry.dto';
 import { CreateGoalDto } from './dto/create-goal.dto';
 
 @Injectable()
 export class FinanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly transactions: TransactionsService,
+  ) {}
 
   async getGoals(userId: string, month: number, year: number) {
     return this.prisma.monthlyGoal.findMany({
@@ -124,7 +128,10 @@ export class FinanceService {
   }
 
   async healthSummary(userId: string) {
-    await this.markOverdue(userId);
+    await Promise.all([
+      this.markOverdue(userId),
+      this.transactions.materializeRecurring(userId),
+    ]);
 
     const now = new Date();
     const startMonth = new Date(
@@ -239,6 +246,16 @@ export class FinanceService {
         ? Math.max(now.getDate(), 1)
         : daysInMonth;
 
+    // Também lança as ocorrências recorrentes vencidas antes de somar
+    const projected = await this.transactions.projectRecurring(
+      userId,
+      startMonth,
+      endMonth,
+    );
+    const plannedExpense = projected
+      .filter((tx) => tx.type === 'EXPENSE')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+
     const grouped = await this.prisma.transaction.groupBy({
       by: ['type'],
       where: {
@@ -254,7 +271,7 @@ export class FinanceService {
     const dailyExpenseAverage = elapsedDays > 0 ? expense / elapsedDays : 0;
     const projectedExpense = Math.max(
       dailyExpenseAverage * daysInMonth,
-      expense,
+      expense + plannedExpense,
     );
 
     const startToday = new Date(now);
@@ -283,6 +300,7 @@ export class FinanceService {
       year: targetYear,
       income,
       expense,
+      plannedExpense,
       projectedExpense,
       projectedBalance: income - projectedExpense,
       overdueCount,

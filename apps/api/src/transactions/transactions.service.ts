@@ -1,11 +1,35 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import type { RecurrenceFrequency, Transaction } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
+
+// Teto de passos por série (~13 anos de ocorrências diárias)
+const MAX_OCCURRENCE_STEPS = 5000;
+
+interface RecurringSeries {
+  seriesId: string;
+  anchor: Date;
+  head: Transaction;
+}
+
+export interface ProjectedTransaction {
+  id: string;
+  amount: number;
+  type: Transaction['type'];
+  category: string;
+  categoryColor: string | null;
+  description: string | null;
+  isRecurring: true;
+  recurrenceFrequency: RecurrenceFrequency | null;
+  occurredAt: Date;
+  projected: true;
+}
 
 @Injectable()
 export class TransactionsService {
   private readonly logger = new Logger(TransactionsService.name);
+  private readonly materializeLocks = new Map<string, Promise<void>>();
   private readonly fallbackCategoryColors = [
     '#0f766e',
     '#f97316',
@@ -41,123 +65,186 @@ export class TransactionsService {
     );
   }
 
-  private addRecurrenceDate(
-    source: Date,
-    recurrenceFrequency: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'YEARLY',
+  /** N-ésima ocorrência contada a partir da âncora (evita deriva: 31/01 → 28/02 → 31/03). */
+  private occurrenceAt(
+    anchor: Date,
+    recurrenceFrequency: RecurrenceFrequency,
+    n: number,
   ) {
     switch (recurrenceFrequency) {
       case 'DAILY': {
-        const next = new Date(source);
-        next.setDate(next.getDate() + 1);
+        const next = new Date(anchor);
+        next.setDate(next.getDate() + n);
         return next;
       }
       case 'WEEKLY': {
-        const next = new Date(source);
-        next.setDate(next.getDate() + 7);
+        const next = new Date(anchor);
+        next.setDate(next.getDate() + 7 * n);
         return next;
       }
       case 'YEARLY':
-        return this.normalizeMonthlyDate(source, 12);
+        return this.normalizeMonthlyDate(anchor, 12 * n);
       case 'MONTHLY':
       default:
-        return this.normalizeMonthlyDate(source, 1);
+        return this.normalizeMonthlyDate(anchor, n);
     }
+  }
+
+  private startOfDay(date: Date) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  private endOfToday() {
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    return end;
+  }
+
+  /**
+   * Séries ativas: a ocorrência mais recente de cada série é a "cabeça".
+   * Se a cabeça deixou de ser recorrente, a série parou.
+   */
+  private async findActiveSeries(userId?: string): Promise<RecurringSeries[]> {
+    const members = await this.prisma.transaction.findMany({
+      where: {
+        ...(userId ? { userId } : {}),
+        OR: [{ isRecurring: true }, { recurrenceSourceId: { not: null } }],
+      },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    const series = new Map<string, RecurringSeries>();
+    for (const tx of members) {
+      const seriesId = tx.recurrenceSourceId ?? tx.id;
+      const current = series.get(seriesId);
+      series.set(seriesId, {
+        seriesId,
+        anchor: current?.anchor ?? tx.occurredAt,
+        head: tx,
+      });
+    }
+
+    return [...series.values()].filter(
+      (s) => s.head.isRecurring && s.head.recurrenceFrequency,
+    );
+  }
+
+  /** Datas da série depois do dia da cabeça e até `until`. */
+  private nextOccurrences(series: RecurringSeries, until: Date) {
+    const frequency = series.head.recurrenceFrequency ?? 'MONTHLY';
+    const headDay = this.startOfDay(series.head.occurredAt);
+    const dates: Date[] = [];
+
+    for (let n = 1; n <= MAX_OCCURRENCE_STEPS; n += 1) {
+      const date = this.occurrenceAt(series.anchor, frequency, n);
+      if (date > until) break;
+      if (this.startOfDay(date) > headDay) dates.push(date);
+    }
+
+    return dates;
+  }
+
+  /**
+   * Cria as ocorrências que já venceram e ainda não existem. Roda sob demanda
+   * (o servidor pode estar dormindo à meia-noite) e no cron diário.
+   */
+  materializeRecurring(userId?: string) {
+    const key = userId ?? '*';
+    const running = this.materializeLocks.get(key);
+    if (running) return running;
+
+    const job = this.runMaterialize(userId).finally(() =>
+      this.materializeLocks.delete(key),
+    );
+    this.materializeLocks.set(key, job);
+    return job;
+  }
+
+  private async runMaterialize(userId?: string) {
+    const until = this.endOfToday();
+    const series = await this.findActiveSeries(userId);
+
+    const data = series.flatMap((s) =>
+      this.nextOccurrences(s, until).map((occurredAt) => ({
+        userId: s.head.userId,
+        amount: s.head.amount,
+        type: s.head.type,
+        category: s.head.category,
+        categoryColor: s.head.categoryColor,
+        categoryId: s.head.categoryId,
+        description: s.head.description,
+        occurredAt,
+        isRecurring: true,
+        recurrenceFrequency: s.head.recurrenceFrequency,
+        recurrenceSourceId: s.seriesId,
+      })),
+    );
+
+    if (data.length === 0) return;
+
+    await this.prisma.transaction.createMany({ data });
+    this.logger.log(`Recurring transactions generated: ${data.length}`);
+  }
+
+  /** Ocorrências futuras (ainda não lançadas) dentro do intervalo, só para exibição. */
+  async projectRecurring(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<ProjectedTransaction[]> {
+    await this.materializeRecurring(userId);
+    const series = await this.findActiveSeries(userId);
+    const today = this.endOfToday();
+
+    return series.flatMap((s) =>
+      this.nextOccurrences(s, end)
+        .filter((date) => date >= start && date < end && date > today)
+        .map((occurredAt) => ({
+          id: `projected:${s.seriesId}:${occurredAt.toISOString()}`,
+          amount: s.head.amount,
+          type: s.head.type,
+          category: s.head.category,
+          categoryColor: s.head.categoryColor,
+          description: s.head.description,
+          isRecurring: true,
+          recurrenceFrequency: s.head.recurrenceFrequency,
+          occurredAt,
+          projected: true as const,
+        })),
+    );
   }
 
   @Cron('0 0 * * *')
   async processRecurringTransactions() {
-    const now = new Date();
-    const todayStart = new Date(now);
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const recurring = await this.prisma.transaction.findMany({
-      where: {
-        isRecurring: true,
-        recurrenceFrequency: {
-          in: ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'],
-        },
-        occurredAt: {
-          lte: now,
-        },
-      },
-      orderBy: {
-        occurredAt: 'asc',
-      },
-    });
-
-    if (!recurring.length) {
-      return;
-    }
-
-    let createdCount = 0;
-
-    for (const tx of recurring) {
-      const recurrenceFrequency = tx.recurrenceFrequency ?? 'MONTHLY';
-      const nextDate = this.addRecurrenceDate(
-        tx.occurredAt,
-        recurrenceFrequency,
-      );
-      if (nextDate < todayStart || nextDate > todayEnd) {
-        continue;
-      }
-
-      const nextStart = new Date(nextDate);
-      nextStart.setHours(0, 0, 0, 0);
-      const nextEnd = new Date(nextDate);
-      nextEnd.setHours(23, 59, 59, 999);
-
-      const alreadyExists = await this.prisma.transaction.findFirst({
-        where: {
-          userId: tx.userId,
-          type: tx.type,
-          category: tx.category,
-          amount: tx.amount,
-          description: tx.description,
-          isRecurring: true,
-          recurrenceFrequency,
-          occurredAt: {
-            gte: nextStart,
-            lte: nextEnd,
-          },
-        },
-        select: { id: true },
-      });
-
-      if (alreadyExists) {
-        continue;
-      }
-
-      await this.prisma.transaction.create({
-        data: {
-          userId: tx.userId,
-          amount: tx.amount,
-          type: tx.type,
-          category: tx.category,
-          categoryColor: tx.categoryColor,
-          description: tx.description,
-          occurredAt: nextDate,
-          isRecurring: true,
-          recurrenceFrequency,
-        },
-      });
-
-      createdCount += 1;
-    }
-
-    if (createdCount > 0) {
-      this.logger.log(`Recurring transactions generated: ${createdCount}`);
-    }
+    await this.materializeRecurring();
   }
 
-  async summary(userId: string, month?: number, year?: number) {
+  private monthRange(month?: number, year?: number) {
     const now = new Date();
     const targetMonth = month ?? now.getMonth() + 1;
     const targetYear = year ?? now.getFullYear();
+    return {
+      targetMonth,
+      targetYear,
+      startDate: new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0),
+      endDate: new Date(targetYear, targetMonth, 1, 0, 0, 0, 0),
+    };
+  }
 
-    const startDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+  async projected(userId: string, month?: number, year?: number) {
+    const { startDate, endDate } = this.monthRange(month, year);
+    return this.projectRecurring(userId, startDate, endDate);
+  }
+
+  async summary(userId: string, month?: number, year?: number) {
+    const { targetMonth, targetYear, startDate, endDate } = this.monthRange(
+      month,
+      year,
+    );
+
+    await this.materializeRecurring(userId);
 
     const grouped = await this.prisma.transaction.groupBy({
       by: ['type'],
@@ -186,14 +273,17 @@ export class TransactionsService {
   }
 
   async expensesByCategory(userId: string, month?: number, year?: number) {
-    const now = new Date();
-    const targetMonth = month ?? now.getMonth() + 1;
-    const targetYear = year ?? now.getFullYear();
+    const { targetMonth, targetYear, startDate, endDate } = this.monthRange(
+      month,
+      year,
+    );
 
-    const startDate = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
-    const endDate = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
+    // Já materializa a série; inclui as despesas recorrentes previstas no mês
+    const projected = (
+      await this.projectRecurring(userId, startDate, endDate)
+    ).filter((tx) => tx.type === 'EXPENSE');
 
-    const grouped = await this.prisma.transaction.groupBy({
+    const realGrouped = await this.prisma.transaction.groupBy({
       by: ['category'],
       where: {
         userId,
@@ -206,12 +296,18 @@ export class TransactionsService {
       _sum: {
         amount: true,
       },
-      orderBy: {
-        _sum: {
-          amount: 'desc',
-        },
-      },
     });
+
+    const totals = new Map<string, number>();
+    for (const item of realGrouped) {
+      totals.set(item.category, item._sum.amount ?? 0);
+    }
+    for (const tx of projected) {
+      totals.set(tx.category, (totals.get(tx.category) ?? 0) + tx.amount);
+    }
+    const grouped = [...totals.entries()]
+      .map(([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
 
     const categories = grouped.map((item) => item.category);
     const latestCategoryColors = await this.prisma.transaction.findMany({
@@ -241,7 +337,7 @@ export class TransactionsService {
 
     const data = grouped.map((item, index) => ({
       category: item.category,
-      amount: item._sum.amount ?? 0,
+      amount: item.amount,
       color:
         colorMap.get(item.category) ??
         this.fallbackCategoryColors[index % this.fallbackCategoryColors.length],
@@ -255,7 +351,9 @@ export class TransactionsService {
     };
   }
 
-  findAll(userId: string) {
+  async findAll(userId: string) {
+    await this.materializeRecurring(userId);
+
     return this.prisma.transaction.findMany({
       where: { userId },
       orderBy: { occurredAt: 'desc' },
@@ -312,6 +410,11 @@ export class TransactionsService {
   }
 
   async remove(userId: string, transactionId: string) {
+    const target = await this.prisma.transaction.findFirst({
+      where: { id: transactionId, userId },
+      select: { id: true, recurrenceSourceId: true, occurredAt: true },
+    });
+
     const deleted = await this.prisma.transaction.deleteMany({
       where: {
         id: transactionId,
@@ -319,8 +422,19 @@ export class TransactionsService {
       },
     });
 
-    if (deleted.count === 0) {
+    if (!target || deleted.count === 0) {
       throw new NotFoundException('Transação não encontrada');
+    }
+
+    // Excluir a ocorrência mais recente encerra a série; senão ela seria recriada
+    const seriesId = target.recurrenceSourceId ?? target.id;
+    const series = await this.findActiveSeries(userId);
+    const active = series.find((s) => s.seriesId === seriesId);
+    if (active && active.head.occurredAt <= target.occurredAt) {
+      await this.prisma.transaction.update({
+        where: { id: active.head.id },
+        data: { isRecurring: false },
+      });
     }
 
     return { deleted: true };

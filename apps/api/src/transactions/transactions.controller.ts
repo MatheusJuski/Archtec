@@ -85,6 +85,24 @@ export class TransactionsController {
     );
   }
 
+  @Get('projected')
+  projected(
+    @Request() req: AuthenticatedRequest,
+    @Query('month') month?: string,
+    @Query('year') year?: string,
+  ) {
+    const { month: parsedMonth, year: parsedYear } = this.parseMonthYear(
+      month,
+      year,
+    );
+
+    return this.transactionsService.projected(
+      req.user.userId,
+      parsedMonth,
+      parsedYear,
+    );
+  }
+
   @Get()
   findAll(@Request() req: AuthenticatedRequest) {
     return this.transactionsService.findAll(req.user.userId);

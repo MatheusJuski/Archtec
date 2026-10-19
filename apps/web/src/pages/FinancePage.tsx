@@ -113,8 +113,10 @@ interface Transaction {
   isRecurring?: boolean
   recurrenceFrequency?: RecurrenceFrequency | null
   occurredAt: string
-  createdAt: string
-  updatedAt: string
+  createdAt?: string
+  updatedAt?: string
+  /** Ocorrência futura de uma recorrência: ainda não lançada, só exibida */
+  projected?: boolean
 }
 
 interface ExpensesByCategoryItem {
@@ -249,15 +251,16 @@ export function FinancePage() {
   const fetchTransactions = useCallback(async () => {
     const { month, year } = selectedMonth
 
-    const [transactionsRes, expensesRes, goalsRes, accountsRes, insightsRes] = await Promise.all([
+    const [transactionsRes, projectedRes, expensesRes, goalsRes, accountsRes, insightsRes] = await Promise.all([
       api.get<Transaction[]>('/transactions'),
+      api.get<Transaction[]>('/transactions/projected', { params: { month, year } }),
       api.get<ExpensesByCategoryResponse>('/transactions/expenses-by-category', { params: { month, year } }),
       api.get<MonthlyGoal[]>('/finance/goals', { params: { month, year } }),
       api.get<AccountEntry[]>('/finance/accounts', { params: { month, year } }),
       api.get<FinanceInsights>('/finance/insights', { params: { month, year } }),
     ])
 
-    setTransactions(transactionsRes.data)
+    setTransactions([...transactionsRes.data, ...projectedRes.data])
     setExpensesByCategory(expensesRes.data.items)
     setGoals(goalsRes.data)
     setAccounts(accountsRes.data)
@@ -495,7 +498,14 @@ export function FinancePage() {
         id: "description",
         header: "Descrição",
         cell: ({ row }) => (
-          <span>{row.original.description?.trim() || "-"}</span>
+          <span className="flex items-center gap-2">
+            {row.original.description?.trim() || "-"}
+            {row.original.projected ? (
+              <span className="chip bg-surface-2 text-muted-foreground" title="Recorrência: será lançada automaticamente na data">
+                Prevista
+              </span>
+            ) : null}
+          </span>
         ),
       },
       {
@@ -525,7 +535,7 @@ export function FinancePage() {
         id: "actions",
         header: "Ações",
         enableSorting: false,
-        cell: ({ row }) => (
+        cell: ({ row }) => row.original.projected ? null : (
           <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
             <Button
               variant="ghost"
@@ -552,8 +562,17 @@ export function FinancePage() {
     [openDeleteModal, openEditModal],
   )
 
+  const monthTransactions = useMemo(
+    () =>
+      transactions.filter((tx) => {
+        const txDate = new Date(tx.occurredAt)
+        return txDate.getMonth() + 1 === selectedMonth.month && txDate.getFullYear() === selectedMonth.year
+      }),
+    [transactions, selectedMonth],
+  )
+
   const table = useReactTable({
-    data: transactions,
+    data: monthTransactions,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
@@ -573,7 +592,7 @@ export function FinancePage() {
   const knownCategories = useMemo(() => {
     const seen = new Map<string, string>()
     for (const tx of transactions) {
-      if (tx.type !== 'EXPENSE') continue
+      if (tx.type !== 'EXPENSE' || tx.projected) continue
       const key = normalizeCategory(tx.category)
       if (!seen.has(key)) seen.set(key, tx.category.trim())
     }
@@ -585,20 +604,16 @@ export function FinancePage() {
   }, [expensesByCategory])
 
   // Chave normalizada: "Mercado", "mercado " e "MERCADO" contam para a mesma meta
+  // Inclui as recorrentes previstas: elas também vão consumir o limite do mês
   const spentByCategory = useMemo(() => {
-    return transactions.reduce<Record<string, number>>((acc, tx) => {
-      const txDate = new Date(tx.occurredAt)
-      if (
-        tx.type === 'EXPENSE' &&
-        txDate.getMonth() + 1 === selectedMonth.month &&
-        txDate.getFullYear() === selectedMonth.year
-      ) {
+    return monthTransactions.reduce<Record<string, number>>((acc, tx) => {
+      if (tx.type === 'EXPENSE') {
         const key = normalizeCategory(tx.category)
         acc[key] = (acc[key] ?? 0) + tx.amount
       }
       return acc
     }, {})
-  }, [transactions, selectedMonth])
+  }, [monthTransactions])
 
   function getAccountVisualState(entry: AccountEntry) {
     if (entry.status === 'PAID') {
@@ -701,7 +716,7 @@ export function FinancePage() {
                 </PieChart>
               </ResponsiveContainer>
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                <span className="label-tech text-muted-foreground">Total gasto</span>
+                <span className="label-tech text-muted-foreground">Total do mês</span>
                 <span className="mt-1 font-mono text-xl font-medium tabular-nums">{currencyFormatter.format(chartTotal)}</span>
               </div>
             </div>
@@ -737,7 +752,7 @@ export function FinancePage() {
         )}
       </Panel>
 
-      <Panel title="Transações" aside={<span className="label-tech tabular-nums">{transactions.length} registros</span>} flush>
+      <Panel title="Transações" aside={<span className="label-tech tabular-nums">{monthTransactions.length} registros</span>} flush>
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -774,7 +789,7 @@ export function FinancePage() {
             ) : (
               <TableRow>
                 <TableCell colSpan={5} className="h-24 text-center">
-                  <span className="label-tech text-muted-foreground">Nenhuma transação cadastrada</span>
+                  <span className="label-tech text-muted-foreground">Nenhuma transação em {selectedMonthLabel}</span>
                 </TableCell>
               </TableRow>
             )}
