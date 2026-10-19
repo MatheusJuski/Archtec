@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { ArrowDownAZ, ArrowUpZA, Pencil, Plus, Trash2 } from "lucide-react"
+import { ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react"
 import {
   ColumnDef,
   flexRender,
@@ -172,6 +172,37 @@ const dateFormatter = new Intl.DateTimeFormat("pt-BR", {
   year: "numeric",
 })
 
+const monthFormatter = new Intl.DateTimeFormat("pt-BR", {
+  month: "long",
+  year: "numeric",
+})
+
+interface MonthRef {
+  month: number
+  year: number
+}
+
+function currentMonthRef(): MonthRef {
+  const now = new Date()
+  return { month: now.getMonth() + 1, year: now.getFullYear() }
+}
+
+function shiftMonth(ref: MonthRef, delta: number): MonthRef {
+  const date = new Date(ref.year, ref.month - 1 + delta, 1)
+  return { month: date.getMonth() + 1, year: date.getFullYear() }
+}
+
+// YYYY-MM-DD no fuso local (toISOString usa UTC e pula para o dia seguinte à noite)
+function todayInputValue() {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+}
+
+function normalizeCategory(value: string) {
+  return value.trim().toLocaleLowerCase("pt-BR")
+}
+
 export function FinancePage() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [expensesByCategory, setExpensesByCategory] = useState<ExpensesByCategoryItem[]>([])
@@ -190,7 +221,8 @@ export function FinancePage() {
   const [accountCategory, setAccountCategory] = useState("")
   const [accountDescription, setAccountDescription] = useState("")
   const [accountAmount, setAccountAmount] = useState("")
-  const [accountDueDate, setAccountDueDate] = useState(new Date().toISOString().slice(0, 10))
+  const [accountDueDate, setAccountDueDate] = useState(todayInputValue)
+  const [selectedMonth, setSelectedMonth] = useState<MonthRef>(currentMonthRef)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null)
   const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null)
@@ -205,7 +237,7 @@ export function FinancePage() {
       category: "",
       description: "",
       amount: "",
-      occurredAt: new Date().toISOString().slice(0, 10),
+      occurredAt: todayInputValue(),
       categoryColor: "#f97316",
       isRecurring: false,
       recurrenceFrequency: "DAILY",
@@ -215,13 +247,11 @@ export function FinancePage() {
   const isRecurring = form.watch("isRecurring")
 
   const fetchTransactions = useCallback(async () => {
-    const now = new Date()
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
+    const { month, year } = selectedMonth
 
     const [transactionsRes, expensesRes, goalsRes, accountsRes, insightsRes] = await Promise.all([
       api.get<Transaction[]>('/transactions'),
-      api.get<ExpensesByCategoryResponse>('/transactions/expenses-by-category'),
+      api.get<ExpensesByCategoryResponse>('/transactions/expenses-by-category', { params: { month, year } }),
       api.get<MonthlyGoal[]>('/finance/goals', { params: { month, year } }),
       api.get<AccountEntry[]>('/finance/accounts', { params: { month, year } }),
       api.get<FinanceInsights>('/finance/insights', { params: { month, year } }),
@@ -236,7 +266,7 @@ export function FinancePage() {
       month: expensesRes.data.month,
       year: expensesRes.data.year,
     })
-  }, [])
+  }, [selectedMonth])
 
   useEffect(() => {
     fetchTransactions()
@@ -250,7 +280,7 @@ export function FinancePage() {
       category: "",
       description: "",
       amount: "",
-      occurredAt: new Date().toISOString().slice(0, 10),
+      occurredAt: todayInputValue(),
       categoryColor: "#f97316",
       isRecurring: false,
       recurrenceFrequency: "DAILY",
@@ -335,7 +365,6 @@ export function FinancePage() {
   async function handleSaveGoal() {
     const category = goalCategory.trim()
     const amount = Number(goalAmount.replace(',', '.'))
-    const now = new Date()
 
     if (!category || !Number.isFinite(amount) || amount <= 0) {
       toast.error('Preencha categoria e valor da meta corretamente')
@@ -347,8 +376,8 @@ export function FinancePage() {
       await api.post('/finance/goals', {
         category,
         targetAmount: amount,
-        month: now.getMonth() + 1,
-        year: now.getFullYear(),
+        month: selectedMonth.month,
+        year: selectedMonth.year,
       })
       setGoalCategory('')
       setGoalAmount('')
@@ -395,9 +424,17 @@ export function FinancePage() {
       setAccountDescription('')
       setAccountAmount('')
       setAccountType('PAYABLE')
-      setAccountDueDate(new Date().toISOString().slice(0, 10))
-      await fetchTransactions()
-      toast.success('Lançamento salvo')
+      setAccountDueDate(todayInputValue())
+
+      // Leva ao mês do vencimento para que o lançamento apareça na lista
+      const [dueYear, dueMonth] = accountDueDate.split('-').map(Number)
+      if (dueYear !== selectedMonth.year || dueMonth !== selectedMonth.month) {
+        setSelectedMonth({ month: dueMonth, year: dueYear })
+        toast.success(`Lançamento salvo em ${monthFormatter.format(new Date(dueYear, dueMonth - 1, 1))}`)
+      } else {
+        await fetchTransactions()
+        toast.success('Lançamento salvo')
+      }
     } catch {
       toast.error('Erro ao salvar lançamento')
     } finally {
@@ -526,38 +563,49 @@ export function FinancePage() {
 
   const chartMonthLabel = useMemo(() => {
     if (!expensesMonth) return ""
-
-    return new Intl.DateTimeFormat("pt-BR", {
-      month: "long",
-      year: "numeric",
-    }).format(new Date(expensesMonth.year, expensesMonth.month - 1, 1))
+    return monthFormatter.format(new Date(expensesMonth.year, expensesMonth.month - 1, 1))
   }, [expensesMonth])
+
+  const selectedMonthLabel = monthFormatter.format(new Date(selectedMonth.year, selectedMonth.month - 1, 1))
+  const todayMonth = currentMonthRef()
+  const isCurrentMonth = todayMonth.month === selectedMonth.month && todayMonth.year === selectedMonth.year
+
+  const knownCategories = useMemo(() => {
+    const seen = new Map<string, string>()
+    for (const tx of transactions) {
+      if (tx.type !== 'EXPENSE') continue
+      const key = normalizeCategory(tx.category)
+      if (!seen.has(key)) seen.set(key, tx.category.trim())
+    }
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [transactions])
 
   const chartTotal = useMemo(() => {
     return expensesByCategory.reduce((sum, item) => sum + item.amount, 0)
   }, [expensesByCategory])
 
+  // Chave normalizada: "Mercado", "mercado " e "MERCADO" contam para a mesma meta
   const spentByCategory = useMemo(() => {
-    const now = new Date()
     return transactions.reduce<Record<string, number>>((acc, tx) => {
       const txDate = new Date(tx.occurredAt)
       if (
         tx.type === 'EXPENSE' &&
-        txDate.getMonth() === now.getMonth() &&
-        txDate.getFullYear() === now.getFullYear()
+        txDate.getMonth() + 1 === selectedMonth.month &&
+        txDate.getFullYear() === selectedMonth.year
       ) {
-        acc[tx.category] = (acc[tx.category] ?? 0) + tx.amount
+        const key = normalizeCategory(tx.category)
+        acc[key] = (acc[key] ?? 0) + tx.amount
       }
       return acc
     }, {})
-  }, [transactions])
+  }, [transactions, selectedMonth])
 
   function getAccountVisualState(entry: AccountEntry) {
     if (entry.status === 'PAID') {
       return {
         cardClass: 'border-l-success',
         badgeClass: 'bg-success text-surface-1',
-        label: 'Pago',
+        label: entry.type === 'PAYABLE' ? 'Pago' : 'Recebido',
       }
     }
 
@@ -601,10 +649,26 @@ export function FinancePage() {
         description="Livro-caixa, projeções, metas e contas do mês."
         className="mb-2"
         actions={
-          <Button variant="brand" onClick={openCreateModal}>
-            <Plus />
-            Nova transação
-          </Button>
+          <>
+            <div className="flex items-center gap-1 border border-line" role="group" aria-label="Mês selecionado">
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))} aria-label="Mês anterior">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="label-tech min-w-36 text-center capitalize tabular-nums">{selectedMonthLabel}</span>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))} aria-label="Próximo mês">
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+            {!isCurrentMonth ? (
+              <Button variant="outline" onClick={() => setSelectedMonth(currentMonthRef())}>
+                Mês atual
+              </Button>
+            ) : null}
+            <Button variant="brand" onClick={openCreateModal}>
+              <Plus />
+              Nova transação
+            </Button>
+          </>
         }
       />
 
@@ -748,13 +812,23 @@ export function FinancePage() {
           </div>
         </Panel>
 
-        <Panel title="Metas mensais">
+        <Panel title="Metas mensais" aside={<span className="label-tech capitalize">{selectedMonthLabel}</span>}>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Defina um limite de gasto por categoria. A barra avança conforme você registra despesas
+            (em &ldquo;Nova transação&rdquo;) com a mesma categoria neste mês.
+          </p>
           <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
             <Input
               placeholder="Categoria da meta"
               value={goalCategory}
               onChange={(e) => setGoalCategory(e.target.value)}
+              list="finance-goal-categories"
             />
+            <datalist id="finance-goal-categories">
+              {knownCategories.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
             <Input
               type="number"
               step="0.01"
@@ -769,10 +843,10 @@ export function FinancePage() {
 
           <div className="mt-4 space-y-3">
             {goals.length === 0 ? (
-              <EmptyState>Nenhuma meta cadastrada para este mês.</EmptyState>
+              <EmptyState>Nenhuma meta cadastrada para {selectedMonthLabel}.</EmptyState>
             ) : (
               goals.map((goal) => {
-                const spent = spentByCategory[goal.category] ?? 0
+                const spent = spentByCategory[normalizeCategory(goal.category)] ?? 0
                 const progress = goal.targetAmount > 0 ? Math.min((spent / goal.targetAmount) * 100, 100) : 0
                 const barTone = progress >= 100 ? "bg-destructive" : progress >= 80 ? "bg-signal" : "bg-success"
                 return (
@@ -802,7 +876,7 @@ export function FinancePage() {
           </div>
         </Panel>
 
-        <Panel title="Contas a pagar e receber">
+        <Panel title="Contas a pagar e receber" aside={<span className="label-tech capitalize">{selectedMonthLabel}</span>}>
           <div className="grid gap-2 sm:grid-cols-2">
             <select className="arch-picker" value={accountType} onChange={(e) => setAccountType(e.target.value as 'PAYABLE' | 'RECEIVABLE')} aria-label="Tipo de lançamento">
               <option value="PAYABLE">A pagar</option>
@@ -817,7 +891,7 @@ export function FinancePage() {
 
           <div className="mt-4 space-y-2">
             {accounts.length === 0 ? (
-              <EmptyState>Nenhum lançamento no mês atual.</EmptyState>
+              <EmptyState>Nenhum lançamento com vencimento em {selectedMonthLabel}.</EmptyState>
             ) : (
               accounts.map((entry) => {
                 const visual = getAccountVisualState(entry)
@@ -839,7 +913,7 @@ export function FinancePage() {
                       <div className="flex gap-1.5">
                         {entry.status !== 'PAID' ? (
                           <Button size="sm" variant="outline" onClick={() => handleMarkAccountPaid(entry.id)}>
-                            Marcar pago
+                            {entry.type === 'PAYABLE' ? 'Marcar pago' : 'Marcar recebido'}
                           </Button>
                         ) : null}
                         <Button size="sm" variant="ghost" onClick={() => handleDeleteAccount(entry.id)}>

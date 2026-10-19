@@ -12,7 +12,7 @@ import { api } from "@/lib/api";
 interface Event {
   id: string;
   title: string;
-  start: string;
+  startTime: string;
 }
 
 interface Task {
@@ -182,9 +182,9 @@ export function DashboardPage() {
   const todayEvents = useMemo(
     () =>
       (events ?? [])
-        .filter((e) => isSameDay(e.start, today))
-        .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
-        .map((e) => ({ id: e.id, title: e.title, time: new Date(e.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })),
+        .filter((e) => isSameDay(e.startTime, today))
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+        .map((e) => ({ id: e.id, title: e.title, time: new Date(e.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })),
     [events, today]
   );
 
@@ -221,8 +221,9 @@ export function DashboardPage() {
 
   const stats = [
     { label: "Tarefas vencidas", value: hasHealth ? healthSummary.tasksOverdue : UNAVAILABLE, tone: (healthSummary?.tasksOverdue ?? 0) > 0 ? "danger" : "default", icon: <AlertTriangle /> },
-    { label: "Tarefas para hoje", value: healthSummary?.tasksDueToday ?? (tasks ? todayTasks.length : UNAVAILABLE), tone: "brand", icon: <CheckSquare /> },
-    { label: "Eventos hoje", value: healthSummary?.eventsToday ?? (events ? todayEvents.length : UNAVAILABLE), tone: "default", icon: <CalendarClock /> },
+    // Contagem local primeiro: o "hoje" do servidor está em UTC e diverge do fuso do usuário à noite
+    { label: "Tarefas para hoje", value: tasks ? todayTasks.length : (healthSummary?.tasksDueToday ?? UNAVAILABLE), tone: "brand", icon: <CheckSquare /> },
+    { label: "Eventos hoje", value: events ? todayEvents.length : (healthSummary?.eventsToday ?? UNAVAILABLE), tone: "default", icon: <CalendarClock /> },
     { label: "Notas totais", value: hasHealth ? healthSummary.notesTotal : UNAVAILABLE, tone: "default", icon: <FileText /> },
     { label: "A receber em aberto", value: money(healthSummary?.receivableOpen, hasHealth), tone: "success", icon: <ArrowDownLeft /> },
     { label: "A pagar em aberto", value: money(healthSummary?.payableOpen, hasHealth), tone: "signal", icon: <ArrowUpRight /> },

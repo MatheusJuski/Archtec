@@ -51,11 +51,15 @@ export class FinanceService {
   }
 
   private async markOverdue(userId: string) {
+    // Só atrasa a partir do dia seguinte ao vencimento
+    const startToday = new Date();
+    startToday.setHours(0, 0, 0, 0);
+
     await this.prisma.accountEntry.updateMany({
       where: {
         userId,
         status: 'PENDING',
-        dueDate: { lt: new Date() },
+        dueDate: { lt: startToday },
       },
       data: { status: 'OVERDUE' },
     });
@@ -228,8 +232,10 @@ export class FinanceService {
     const startMonth = new Date(targetYear, targetMonth - 1, 1, 0, 0, 0, 0);
     const endMonth = new Date(targetYear, targetMonth, 1, 0, 0, 0, 0);
     const daysInMonth = new Date(targetYear, targetMonth, 0).getDate();
-    const elapsedDays =
-      now.getMonth() + 1 === targetMonth && now.getFullYear() === targetYear
+    const isFutureMonth = startMonth > now;
+    const elapsedDays = isFutureMonth
+      ? 0
+      : now.getMonth() + 1 === targetMonth && now.getFullYear() === targetYear
         ? Math.max(now.getDate(), 1)
         : daysInMonth;
 
@@ -246,7 +252,10 @@ export class FinanceService {
     const expense = grouped.find((g) => g.type === 'EXPENSE')?._sum.amount ?? 0;
 
     const dailyExpenseAverage = elapsedDays > 0 ? expense / elapsedDays : 0;
-    const projectedExpense = dailyExpenseAverage * daysInMonth;
+    const projectedExpense = Math.max(
+      dailyExpenseAverage * daysInMonth,
+      expense,
+    );
 
     const startToday = new Date(now);
     startToday.setHours(0, 0, 0, 0);
