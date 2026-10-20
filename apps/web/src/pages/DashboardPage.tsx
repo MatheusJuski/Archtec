@@ -8,11 +8,20 @@ import { ShaderBackdrop } from "@/components/shader/ShaderBackdrop";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Stat } from "@/components/ui/stat";
 import { api } from "@/lib/api";
+import { allDayToLocalDate } from "@/lib/calendar-dates";
 
 interface Event {
   id: string;
   title: string;
   startTime: string;
+  endTime: string;
+  allDay?: boolean;
+}
+
+/** Evento de dia inteiro (possivelmente de vários dias) que cobre o dia informado. */
+function allDayCovers(event: Event, day: Date) {
+  const dayStart = new Date(day.getFullYear(), day.getMonth(), day.getDate());
+  return allDayToLocalDate(event.startTime) <= dayStart && dayStart < allDayToLocalDate(event.endTime);
 }
 
 interface Task {
@@ -182,9 +191,14 @@ export function DashboardPage() {
   const todayEvents = useMemo(
     () =>
       (events ?? [])
-        .filter((e) => isSameDay(e.startTime, today))
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-        .map((e) => ({ id: e.id, title: e.title, time: new Date(e.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) })),
+        .filter((e) => (e.allDay ? allDayCovers(e, today) : isSameDay(e.startTime, today)))
+        // Dia inteiro primeiro, depois por horário
+        .sort((a, b) => Number(Boolean(b.allDay)) - Number(Boolean(a.allDay)) || new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+        .map((e) => ({
+          id: e.id,
+          title: e.title,
+          time: e.allDay ? "Dia inteiro" : new Date(e.startTime).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        })),
     [events, today]
   );
 

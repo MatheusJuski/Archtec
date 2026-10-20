@@ -21,8 +21,14 @@ model User {
   categories Category[]
   monthlyGoals MonthlyGoal[]
   accountEntries AccountEntry[]
+  calendarSources CalendarSource[]
 
   @@map("users")
+}
+
+enum CalendarSourceType {
+  ICS_URL
+  ICS_FILE
 }
 
 enum TransactionType {
@@ -108,6 +114,8 @@ model Event {
   description String?
   startTime DateTime
   endTime   DateTime
+  allDay    Boolean  @default(false)
+  location  String?
   isRecurring Boolean @default(false)
   recurrenceFrequency RecurrenceFrequency?
   createdAt DateTime @default(now())
@@ -115,6 +123,11 @@ model Event {
 
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Eventos importados de um calendário externo (.ics por link ou arquivo)
+  calendarSourceId String?
+  calendarSource   CalendarSource? @relation(fields: [calendarSourceId], references: [id], onDelete: Cascade)
+  externalUid      String?
 
   taskId    String?
   task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
@@ -128,6 +141,27 @@ model Event {
   @@index([taskId])
   @@index([noteId])
   @@index([startTime])
+  @@index([calendarSourceId])
+  @@unique([calendarSourceId, externalUid])
+}
+
+model CalendarSource {
+  id           String             @id @default(uuid())
+  name         String
+  type         CalendarSourceType
+  url          String?
+  color        String?
+  lastSyncedAt DateTime?
+  lastError    String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events Event[]
+
+  @@map("calendar_sources")
+  @@index([userId])
 }
 
 model Transaction {

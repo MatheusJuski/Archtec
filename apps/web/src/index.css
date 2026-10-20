@@ -809,6 +809,13 @@
   color: var(--foreground);
 }
 
+/* Eventos de calendários externos: a cor vem da fonte (--event-color, definida inline). */
+.arch-calendar .rbc-event.arch-event-external {
+  background: color-mix(in oklab, var(--event-color) 18%, var(--card));
+  border-left-color: var(--event-color);
+  color: var(--foreground);
+}
+
 @media (max-width: 900px) {
   .arch-calendar-layout {
     grid-template-columns: 1fr;

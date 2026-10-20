@@ -15,6 +15,12 @@ export const throttlerOptions: ThrottlerModuleOptions = {
   errorMessage: 'Muitas requisições. Aguarde um pouco e tente novamente.',
 };
 
+/** Importar/sincronizar calendários baixa e processa arquivos grandes: limite mais baixo. */
+export const calendarSyncThrottle = {
+  default: { ttl: MINUTE, limit: 15 },
+  hourly: { ttl: HOUR, limit: 200 },
+};
+
 /** Limite mais rígido para rotas de autenticação (força bruta de senha). */
 export const authThrottle = {
   default: { ttl: MINUTE, limit: 10 },

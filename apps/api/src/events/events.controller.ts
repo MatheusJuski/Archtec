@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Request,
   UseGuards,
@@ -11,6 +12,7 @@ import {
 import { EventsService } from './events.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventDto } from './dto/update-event.dto';
 import type { AuthenticatedRequest } from '../auth/authenticated-request';
 
 @Controller('events')
@@ -26,6 +28,15 @@ export class EventsController {
   @Post()
   create(@Request() req: AuthenticatedRequest, @Body() dto: CreateEventDto) {
     return this.eventsService.create(req.user.userId, dto);
+  }
+
+  @Patch(':id')
+  update(
+    @Request() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() dto: UpdateEventDto,
+  ) {
+    return this.eventsService.update(req.user.userId, id, dto);
   }
 
   @Delete(':id')

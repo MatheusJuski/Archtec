@@ -12,6 +12,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { SearchModule } from './search/search.module';
 import { HealthController } from './health.controller';
 import { FinanceModule } from './finance/finance.module';
+import { CalendarSourcesModule } from './calendar-sources/calendar-sources.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FinanceModule } from './finance/finance.module';
     NotesModule,
     TasksModule,
     EventsModule,
+    CalendarSourcesModule,
     TransactionsModule,
     FinanceModule,
     SearchModule,

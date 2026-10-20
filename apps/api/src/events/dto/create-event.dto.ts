@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  MaxLength,
   ValidateIf,
 } from 'class-validator';
 
@@ -19,17 +20,29 @@ export enum EventRecurrenceFrequency {
 export class CreateEventDto {
   @IsString()
   @IsNotEmpty()
+  @MaxLength(300)
   title: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(10000)
   description?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  location?: string;
 
   @IsDateString()
   startTime: string;
 
   @IsDateString()
   endTime: string;
+
+  /** Dia inteiro: startTime/endTime à meia-noite UTC, com fim exclusivo (padrão iCal). */
+  @IsOptional()
+  @IsBoolean()
+  allDay?: boolean;
 
   @IsOptional()
   @IsUUID()

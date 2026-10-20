@@ -1,6 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight,
+  Clock,
+  FileText,
+  ListTodo,
+  Lock,
+  MapPin,
+  Pencil,
+  Repeat,
+  Trash2,
+} from "lucide-react";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CalendarSourcesDialog } from "@/components/CalendarSourcesDialog";
+import { allDayToLocalDate, localDateToAllDayIso } from "@/lib/calendar-dates";
 import { PageHeader } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, getApiErrorMessage } from "@/lib/api";
@@ -59,24 +74,59 @@ import {
 } from "@/components/ui/dialog";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
+type RecurrenceFrequency = "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY";
+
+interface EventSource {
+  id: string;
+  name: string;
+  color: string | null;
+  type: "ICS_URL" | "ICS_FILE";
+}
+
 interface EventFromApi {
   id: string;
   title: string;
   description: string | null;
+  location: string | null;
   startTime: string;
   endTime: string;
+  allDay: boolean;
+  isRecurring: boolean;
+  recurrenceFrequency: RecurrenceFrequency | null;
   taskId: string | null;
   noteId: string | null;
+  task: { id: string; title: string } | null;
+  note: { id: string; title: string } | null;
+  calendarSource: EventSource | null;
 }
 
 interface CalendarEvent {
   id: string;
   title: string;
   description: string | null;
+  location: string | null;
   start: Date;
   end: Date;
+  allDay: boolean;
+  isRecurring: boolean;
+  recurrenceFrequency: RecurrenceFrequency | null;
   isTimeBlock: boolean;
   noteId: string | null;
+  task: { id: string; title: string } | null;
+  note: { id: string; title: string } | null;
+  source: EventSource | null;
+}
+
+const RECURRENCE_LABELS: Record<RecurrenceFrequency, string> = {
+  DAILY: "Diária",
+  WEEKLY: "Semanal",
+  MONTHLY: "Mensal",
+  YEARLY: "Anual",
+};
+
+/** Eventos de calendários assinados por link são atualizados pelo Google/Outlook: só leitura aqui. */
+function isReadOnlyEvent(event: CalendarEvent) {
+  return event.source?.type === "ICS_URL";
 }
 
 interface NoteFromApi {
@@ -115,33 +165,22 @@ const createEventSchema = z
   .object({
     title: z.string().trim().min(1, "Título é obrigatório"),
     description: z.string().optional(),
+    location: z.string().optional(),
     noteId: z.string().optional(),
+    allDay: z.boolean().optional(),
     startDate: z.string().min(1, "Data inicial é obrigatória"),
-    startTime: z.string().min(1, "Hora inicial é obrigatória"),
+    startTime: z.string(),
     endDate: z.string().min(1, "Data final é obrigatória"),
-    endTime: z.string().min(1, "Hora final é obrigatória"),
+    endTime: z.string(),
     isRecurring: z.boolean().optional(),
     recurrenceFrequency: z.enum(["DAILY", "WEEKLY", "MONTHLY", "YEARLY"]).optional(),
   })
   .refine((data) => {
-    const start = buildDateFromInputs(data.startDate, data.startTime);
-    const end = buildDateFromInputs(data.endDate, data.endTime);
-
-    return start !== null && end !== null && end > start;
+    const range = buildRangeFromValues(data);
+    return range !== null && range.end > range.start;
   }, {
-    message: "A hora de término deve ser posterior ao início",
+    message: "O término deve ser posterior ao início",
     path: ["endTime"],
-  })
-  .refine((data) => {
-    const start = buildDateFromInputs(data.startDate, data.startTime);
-    const end = buildDateFromInputs(data.endDate, data.endTime);
-    if (!start || !end) return false;
-
-    const { minAllowed, maxAllowed } = getEventWindow();
-    return start >= minAllowed && start <= maxAllowed && end >= minAllowed && end <= maxAllowed;
-  }, {
-    message: `Eventos só podem ficar entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`,
-    path: ["startDate"],
   })
   .refine((data) => {
     if (!data.isRecurring) return true;
@@ -201,6 +240,66 @@ function dateToFormParts(date: Date) {
   return {
     date: `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`,
     time: `${pad2(date.getHours())}:${pad2(date.getMinutes())}`,
+  };
+}
+
+/**
+ * Converte o formulário no intervalo do evento. Em "dia inteiro" a data final
+ * do formulário é inclusiva, e o fim vira a meia-noite do dia seguinte.
+ */
+function buildRangeFromValues(values: {
+  allDay?: boolean;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+}) {
+  if (values.allDay) {
+    const start = buildDateFromInputs(values.startDate, "00:00");
+    const lastDay = buildDateFromInputs(values.endDate, "00:00");
+    if (!start || !lastDay) return null;
+    return { start, end: addDays(lastDay, 1) };
+  }
+
+  const start = buildDateFromInputs(values.startDate, values.startTime);
+  const end = buildDateFromInputs(values.endDate, values.endTime);
+  if (!start || !end) return null;
+  return { start, end };
+}
+
+function formatEventWhen(event: CalendarEvent) {
+  const dayFormat = "EEEE, d 'de' MMMM 'de' yyyy";
+  if (event.allDay) {
+    const lastDay = addDays(event.end, -1);
+    const first = format(event.start, dayFormat, { locale: ptBR });
+    if (lastDay <= event.start) return `${capitalizeLabel(first)} · Dia inteiro`;
+    return `${capitalizeLabel(first)} até ${format(lastDay, dayFormat, { locale: ptBR })} · Dia inteiro`;
+  }
+
+  const sameDay = startOfDay(event.start).getTime() === startOfDay(event.end).getTime();
+  const startLabel = format(event.start, `${dayFormat}, HH:mm`, { locale: ptBR });
+  const endLabel = sameDay
+    ? format(event.end, "HH:mm", { locale: ptBR })
+    : format(event.end, `${dayFormat}, HH:mm`, { locale: ptBR });
+  return `${capitalizeLabel(startLabel)} – ${endLabel}`;
+}
+
+function mapEventFromApi(event: EventFromApi): CalendarEvent {
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description,
+    location: event.location,
+    start: event.allDay ? allDayToLocalDate(event.startTime) : new Date(event.startTime),
+    end: event.allDay ? allDayToLocalDate(event.endTime) : new Date(event.endTime),
+    allDay: event.allDay,
+    isRecurring: event.isRecurring,
+    recurrenceFrequency: event.recurrenceFrequency,
+    isTimeBlock: Boolean(event.taskId),
+    noteId: event.noteId,
+    task: event.task,
+    note: event.note,
+    source: event.calendarSource,
   };
 }
 
@@ -288,6 +387,9 @@ export function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [isSourcesDialogOpen, setIsSourcesDialogOpen] = useState(false);
   const [activeDragTask, setActiveDragTask] = useState<FlatTask | null>(null);
   const [view, setView] = useState<View>(Views.MONTH);
   const [date, setDate] = useState(new Date());
@@ -307,7 +409,9 @@ export function CalendarPage() {
     defaultValues: {
       title: "",
       description: "",
+      location: "",
       noteId: "",
+      allDay: false,
       startDate: "",
       startTime: "09:00",
       endDate: "",
@@ -327,16 +431,7 @@ export function CalendarPage() {
 
   const fetchEvents = useCallback(async () => {
     const res = await api.get<EventFromApi[]>("/events");
-    const mapped = res.data.map((event) => ({
-      id: event.id,
-      title: event.title,
-      description: event.description,
-      start: new Date(event.startTime),
-      end: new Date(event.endTime),
-      isTimeBlock: Boolean(event.taskId),
-      noteId: event.noteId,
-    }));
-    setEvents(mapped);
+    setEvents(res.data.map(mapEventFromApi));
   }, []);
 
   useEffect(() => {
@@ -344,6 +439,26 @@ export function CalendarPage() {
       .catch(() => toast.error("Erro ao carregar eventos"))
       .finally(() => setLoading(false));
   }, [fetchEvents]);
+
+  // Atualiza calendários assinados por link em segundo plano; recarrega se algo mudou.
+  useEffect(() => {
+    api
+      .post<{ synced: number; failed: number }>("/calendar-sources/sync")
+      .then((res) => {
+        if (res.data.synced > 0) void fetchEvents();
+        if (res.data.failed > 0) {
+          toast.error("Algum calendário externo não sincronizou. Veja em “Calendários externos”.");
+        }
+      })
+      .catch(() => {});
+  }, [fetchEvents]);
+
+  const isAllDayForm = Boolean(form.watch("allDay"));
+  // Ao editar um evento antigo (ex.: importado), o limite nativo do <input type="date"> impediria salvar.
+  const dateMin = editingEvent ? undefined : eventWindow.minDate;
+  const dateMax = editingEvent ? undefined : eventWindow.maxDate;
+
+  const localEventCount = useMemo(() => events.filter((event) => !event.source).length, [events]);
 
   useEffect(() => {
     api
@@ -534,60 +649,118 @@ export function CalendarPage() {
 
     const startParts = dateToFormParts(start);
     const endParts = dateToFormParts(normalizedEnd);
+    // No mês, clicar num dia sugere evento com hora; na faixa "dia inteiro" da semana/dia, sugere dia inteiro.
+    const isAllDaySlot =
+      view !== Views.MONTH &&
+      end > start &&
+      start.getTime() === startOfDay(start).getTime() &&
+      end.getTime() === startOfDay(end).getTime();
+    const allDayLastDay = dateToFormParts(addDays(end, -1)).date;
 
+    setEditingEvent(null);
     form.reset({
       title: "",
       description: "",
+      location: "",
       noteId: "",
+      allDay: isAllDaySlot,
       startDate: startParts.date,
-      startTime: startParts.time,
-      endDate: endParts.date,
-      endTime: endParts.time,
+      startTime: isAllDaySlot ? "09:00" : startParts.time,
+      endDate: isAllDaySlot ? allDayLastDay : endParts.date,
+      endTime: isAllDaySlot ? "10:00" : endParts.time,
       isRecurring: false,
       recurrenceFrequency: "WEEKLY",
     });
     setIsCreateDialogOpen(true);
   }
 
-  async function onCreateEvent(values: CreateEventValues) {
-    setIsSaving(true);
-    try {
-      const start = buildDateFromInputs(values.startDate, values.startTime);
-      const end = buildDateFromInputs(values.endDate, values.endTime);
+  function openEditEvent(event: CalendarEvent) {
+    const startParts = dateToFormParts(event.start);
+    const endParts = dateToFormParts(event.allDay ? addDays(event.end, -1) : event.end);
+
+    setEditingEvent(event);
+    form.reset({
+      title: event.title,
+      description: event.description ?? "",
+      location: event.location ?? "",
+      noteId: event.noteId ?? "",
+      allDay: event.allDay,
+      startDate: startParts.date,
+      startTime: event.allDay ? "09:00" : startParts.time,
+      endDate: endParts.date,
+      endTime: event.allDay ? "10:00" : endParts.time,
+      isRecurring: event.isRecurring,
+      recurrenceFrequency: event.recurrenceFrequency ?? "WEEKLY",
+    });
+    setSelectedEvent(null);
+    setIsCreateDialogOpen(true);
+  }
+
+  async function onSubmitEvent(values: CreateEventValues) {
+    const range = buildRangeFromValues(values);
+    if (!range || range.end <= range.start) {
+      toast.error("O término deve ser posterior ao início");
+      return;
+    }
+
+    const { start, end } = range;
+    const timesChanged =
+      !editingEvent ||
+      editingEvent.allDay !== Boolean(values.allDay) ||
+      editingEvent.start.getTime() !== start.getTime() ||
+      editingEvent.end.getTime() !== end.getTime();
+
+    // Eventos antigos (ex.: importados) podem ter título/descrição editados sem mexer no horário.
+    if (timesChanged) {
       const { minAllowed, maxAllowed } = getEventWindow();
-
-      if (!start || !end || end <= start) {
-        toast.error("A hora de término deve ser posterior ao início");
-        return;
-      }
-
       if (start < minAllowed || start > maxAllowed || end < minAllowed || end > maxAllowed) {
         toast.error(`Use um período entre 1 dia no passado e ${EVENT_FUTURE_LIMIT_YEARS} anos no futuro`);
         return;
       }
+    }
 
-      await api.post("/events", {
-        title: values.title,
-        description: values.description?.trim() || undefined,
-        noteId: values.noteId?.trim() || undefined,
-        startTime: start.toISOString(),
-        endTime: end.toISOString(),
-        isRecurring: Boolean(values.isRecurring),
-        recurrenceFrequency: values.isRecurring ? values.recurrenceFrequency : undefined,
-      });
+    const allDay = Boolean(values.allDay);
+    const payload = {
+      title: values.title,
+      description: values.description?.trim() ?? "",
+      location: values.location?.trim() ?? "",
+      allDay,
+      startTime: allDay ? localDateToAllDayIso(start) : start.toISOString(),
+      endTime: allDay ? localDateToAllDayIso(end) : end.toISOString(),
+      isRecurring: Boolean(values.isRecurring),
+      recurrenceFrequency: values.isRecurring ? values.recurrenceFrequency : undefined,
+    };
+
+    setIsSaving(true);
+    try {
+      if (editingEvent) {
+        await api.patch(`/events/${editingEvent.id}`, {
+          ...payload,
+          noteId: values.noteId?.trim() || null,
+        });
+      } else {
+        await api.post("/events", {
+          ...payload,
+          description: payload.description || undefined,
+          location: payload.location || undefined,
+          noteId: values.noteId?.trim() || undefined,
+        });
+      }
 
       await fetchEvents();
       setIsCreateDialogOpen(false);
+      toast.success(editingEvent ? "Evento atualizado" : "Evento criado com sucesso");
+      setEditingEvent(null);
       form.reset();
-      toast.success("Evento criado com sucesso");
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Erro ao criar evento"));
+      toast.error(getApiErrorMessage(error, editingEvent ? "Erro ao salvar evento" : "Erro ao criar evento"));
     } finally {
       setIsSaving(false);
     }
   }
 
   function handleDeleteEvent(event: CalendarEvent) {
+    setSelectedEvent(null);
     setPendingDelete({ kind: "one", event });
   }
 
@@ -597,8 +770,8 @@ export function CalendarPage() {
       await api.delete(`/events/${event.id}`);
       await fetchEvents();
       toast.success("Evento excluído");
-    } catch {
-      toast.error("Erro ao excluir evento");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Erro ao excluir evento"));
     } finally {
       setIsSaving(false);
       setPendingDelete(null);
@@ -606,7 +779,7 @@ export function CalendarPage() {
   }
 
   async function handleDeleteAllEvents() {
-    if (events.length === 0) {
+    if (localEventCount === 0) {
       toast.message("Não há eventos para remover");
       return;
     }
@@ -650,9 +823,17 @@ export function CalendarPage() {
     [],
   );
 
-  const eventStyleGetter: EventPropGetter<CalendarEvent> = (event) => ({
-    className: event.isTimeBlock ? "arch-event-timeblock" : "arch-event-generic",
-  });
+  const eventStyleGetter: EventPropGetter<CalendarEvent> = (event) => {
+    if (event.source) {
+      return {
+        className: "arch-event-external",
+        style: { "--event-color": event.source.color ?? "#7c5cff" } as React.CSSProperties,
+      };
+    }
+    return {
+      className: event.isTimeBlock ? "arch-event-timeblock" : "arch-event-generic",
+    };
+  };
 
   const selectedTaskCount = tasks.length;
 
@@ -671,14 +852,21 @@ export function CalendarPage() {
           title="Calendário"
           description="Arraste tarefas para a agenda para criar blocos de tempo."
           actions={
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleDeleteAllEvents}
-              disabled={isSaving || events.length === 0}
-            >
-              Limpar eventos
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setIsSourcesDialogOpen(true)}>
+                <CalendarDays className="size-4" />
+                Calendários externos
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleDeleteAllEvents}
+                disabled={isSaving || localEventCount === 0}
+                title="Remove os eventos criados no Archtec. Calendários externos são removidos em “Calendários externos”."
+              >
+                Limpar eventos
+              </Button>
+            </div>
           }
         />
 
@@ -719,6 +907,7 @@ export function CalendarPage() {
                   onNavigate={setDate}
                   startAccessor="start"
                   endAccessor="end"
+                  allDayAccessor="allDay"
                   views={[Views.MONTH, Views.WEEK, Views.DAY]}
                   step={CALENDAR_STEP_MINUTES}
                   timeslots={CALENDAR_TIMESLOTS}
@@ -726,24 +915,156 @@ export function CalendarPage() {
                   popup
                   selectable
                   onSelectSlot={handleSelectSlot}
-                  onSelectEvent={handleDeleteEvent}
+                  onSelectEvent={setSelectedEvent}
                   components={{
                     toolbar: CalendarToolbar,
                   }}
                   eventPropGetter={eventStyleGetter}
                 />
 
-                <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-                  <DialogContent>
+                <Dialog
+                  open={selectedEvent !== null}
+                  onOpenChange={(open) => !open && setSelectedEvent(null)}
+                >
+                  <DialogContent className="max-h-[90vh] overflow-y-auto">
+                    {selectedEvent ? (
+                      <>
+                        <DialogHeader>
+                          <span
+                            className="label-tech inline-flex items-center gap-1.5 text-muted-foreground"
+                          >
+                            <span
+                              aria-hidden
+                              className="inline-block size-2.5 border border-ink"
+                              style={{
+                                background: selectedEvent.source
+                                  ? (selectedEvent.source.color ?? "#7c5cff")
+                                  : selectedEvent.isTimeBlock
+                                    ? "var(--success)"
+                                    : "var(--brand)",
+                              }}
+                            />
+                            {selectedEvent.source
+                              ? selectedEvent.source.name
+                              : selectedEvent.isTimeBlock
+                                ? "Bloco de tempo"
+                                : "Evento"}
+                          </span>
+                          <DialogTitle className="wrap-break-word pr-6">{selectedEvent.title}</DialogTitle>
+                          <DialogDescription className="flex items-start gap-2">
+                            <Clock className="mt-0.5 size-4 shrink-0" />
+                            <span>{formatEventWhen(selectedEvent)}</span>
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <dl className="space-y-3 text-sm">
+                          {selectedEvent.location ? (
+                            <div className="flex items-start gap-2">
+                              <dt className="sr-only">Local</dt>
+                              <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                              <dd className="wrap-break-word">{selectedEvent.location}</dd>
+                            </div>
+                          ) : null}
+
+                          {selectedEvent.isRecurring && selectedEvent.recurrenceFrequency ? (
+                            <div className="flex items-start gap-2">
+                              <dt className="sr-only">Recorrência</dt>
+                              <Repeat className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                              <dd>Repete: {RECURRENCE_LABELS[selectedEvent.recurrenceFrequency]}</dd>
+                            </div>
+                          ) : null}
+
+                          {selectedEvent.task ? (
+                            <div className="flex items-start gap-2">
+                              <dt className="sr-only">Tarefa</dt>
+                              <ListTodo className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                              <dd>
+                                <Link to="/tasks" className="underline underline-offset-2 hover:text-brand">
+                                  {selectedEvent.task.title}
+                                </Link>
+                              </dd>
+                            </div>
+                          ) : null}
+
+                          {selectedEvent.note ? (
+                            <div className="flex items-start gap-2">
+                              <dt className="sr-only">Nota</dt>
+                              <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                              <dd>
+                                <Link
+                                  to={`/notes/${selectedEvent.note.id}`}
+                                  className="underline underline-offset-2 hover:text-brand"
+                                >
+                                  {selectedEvent.note.title?.trim() || "Sem título"}
+                                </Link>
+                              </dd>
+                            </div>
+                          ) : null}
+
+                          <div>
+                            <dt className="label-tech mb-1 text-muted-foreground">Descrição</dt>
+                            <dd className="max-h-64 overflow-y-auto whitespace-pre-wrap wrap-break-word border border-line bg-surface-1/40 px-3 py-2">
+                              {selectedEvent.description?.trim() || (
+                                <span className="text-muted-foreground">Sem descrição.</span>
+                              )}
+                            </dd>
+                          </div>
+
+                          {isReadOnlyEvent(selectedEvent) ? (
+                            <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                              <Lock className="mt-0.5 size-3.5 shrink-0" />
+                              Sincronizado por link de “{selectedEvent.source?.name}”. Para alterar, edite no
+                              Google/Outlook — a mudança aparece aqui na próxima sincronização.
+                            </p>
+                          ) : null}
+                        </dl>
+
+                        <DialogFooter>
+                          <Button type="button" variant="outline" onClick={() => setSelectedEvent(null)}>
+                            Fechar
+                          </Button>
+                          {!isReadOnlyEvent(selectedEvent) ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleDeleteEvent(selectedEvent)}
+                                disabled={isSaving}
+                              >
+                                <Trash2 className="size-4" />
+                                Excluir
+                              </Button>
+                              <Button type="button" onClick={() => openEditEvent(selectedEvent)}>
+                                <Pencil className="size-4" />
+                                Editar
+                              </Button>
+                            </>
+                          ) : null}
+                        </DialogFooter>
+                      </>
+                    ) : null}
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog
+                  open={isCreateDialogOpen}
+                  onOpenChange={(open) => {
+                    setIsCreateDialogOpen(open);
+                    if (!open) setEditingEvent(null);
+                  }}
+                >
+                  <DialogContent className="max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle>Novo evento</DialogTitle>
+                      <DialogTitle>{editingEvent ? "Editar evento" : "Novo evento"}</DialogTitle>
                       <DialogDescription>
-                        Preencha os dados para criar um evento no calendário.
+                        {editingEvent
+                          ? "Altere os dados do evento e salve."
+                          : "Preencha os dados para criar um evento no calendário."}
                       </DialogDescription>
                     </DialogHeader>
 
                     <Form {...form}>
-                      <form onSubmit={form.handleSubmit(onCreateEvent)} className="space-y-4">
+                      <form onSubmit={form.handleSubmit(onSubmitEvent)} className="space-y-4">
                         <FormField
                           control={form.control}
                           name="title"
@@ -765,7 +1086,26 @@ export function CalendarPage() {
                             <FormItem>
                               <FormLabel>Descrição</FormLabel>
                               <FormControl>
-                                <Input placeholder="Detalhes do evento" {...field} />
+                                <textarea
+                                  rows={3}
+                                  placeholder="Detalhes do evento"
+                                  className="flex min-h-18 w-full resize-y border border-input bg-card px-3 py-2 text-base transition-[border-color,box-shadow] duration-150 placeholder:text-muted-foreground hover:border-ink/50 focus-visible:border-ink focus-visible:shadow-[2px_2px_0_0_var(--brand)] focus-visible:outline-none md:text-sm"
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="location"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Local</FormLabel>
+                              <FormControl>
+                                <Input placeholder="Ex: Sala 2 ou link da reunião" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -797,6 +1137,25 @@ export function CalendarPage() {
                           )}
                         />
 
+                        <FormField
+                          control={form.control}
+                          name="allDay"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <label className="flex h-10 cursor-pointer items-center gap-2.5 border border-input bg-card px-3 text-sm">
+                                  <input
+                                    type="checkbox"
+                                    checked={Boolean(field.value)}
+                                    onChange={(event) => field.onChange(event.target.checked)}
+                                  />
+                                  Dia inteiro
+                                </label>
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
                         <div className="grid gap-4 md:grid-cols-2">
                           <FormField
                             control={form.control}
@@ -805,15 +1164,17 @@ export function CalendarPage() {
                               <FormItem>
                                 <FormLabel>Início</FormLabel>
                                 <FormControl>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <Input type="date" min={eventWindow.minDate} max={eventWindow.maxDate} {...field} />
-                                    <FormField
-                                      control={form.control}
-                                      name="startTime"
-                                      render={({ field: timeField }) => (
-                                        <Input type="time" step={900} {...timeField} />
-                                      )}
-                                    />
+                                  <div className={isAllDayForm ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
+                                    <Input type="date" min={dateMin} max={dateMax} {...field} />
+                                    {!isAllDayForm ? (
+                                      <FormField
+                                        control={form.control}
+                                        name="startTime"
+                                        render={({ field: timeField }) => (
+                                          <Input type="time" step={900} {...timeField} />
+                                        )}
+                                      />
+                                    ) : null}
                                   </div>
                                 </FormControl>
                                 <FormMessage />
@@ -828,15 +1189,17 @@ export function CalendarPage() {
                               <FormItem>
                                 <FormLabel>Término</FormLabel>
                                 <FormControl>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <Input type="date" min={eventWindow.minDate} max={eventWindow.maxDate} {...field} />
-                                    <FormField
-                                      control={form.control}
-                                      name="endTime"
-                                      render={({ field: timeField }) => (
-                                        <Input type="time" step={900} {...timeField} />
-                                      )}
-                                    />
+                                  <div className={isAllDayForm ? "grid gap-2" : "grid grid-cols-2 gap-2"}>
+                                    <Input type="date" min={dateMin} max={dateMax} {...field} />
+                                    {!isAllDayForm ? (
+                                      <FormField
+                                        control={form.control}
+                                        name="endTime"
+                                        render={({ field: timeField }) => (
+                                          <Input type="time" step={900} {...timeField} />
+                                        )}
+                                      />
+                                    ) : null}
                                   </div>
                                 </FormControl>
                                 <FormMessage />
@@ -927,6 +1290,14 @@ export function CalendarPage() {
             </div>
           ) : null}
         </DragOverlay>
+
+        <CalendarSourcesDialog
+          open={isSourcesDialogOpen}
+          onOpenChange={setIsSourcesDialogOpen}
+          onEventsChanged={() => {
+            fetchEvents().catch(() => toast.error("Erro ao recarregar eventos"));
+          }}
+        />
 
         <ConfirmDialog
           open={pendingDelete !== null}
