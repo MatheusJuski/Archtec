@@ -99,18 +99,36 @@ export class FinanceService {
     });
   }
 
+  /** Quitar a conta lança a transação correspondente: ela passa a contar como realizada em todo o app. */
   async markAccountPaid(userId: string, id: string) {
-    const updated = await this.prisma.accountEntry.updateMany({
+    const entry = await this.prisma.accountEntry.findFirst({
       where: { id, userId },
-      data: {
-        status: 'PAID',
-        paidAt: new Date(),
-      },
     });
 
-    if (updated.count === 0) {
+    if (!entry) {
       throw new NotFoundException('Lançamento não encontrado');
     }
+    if (entry.status === 'PAID') {
+      return { paid: true };
+    }
+
+    const paidAt = new Date();
+    await this.prisma.$transaction([
+      this.prisma.accountEntry.update({
+        where: { id },
+        data: { status: 'PAID', paidAt },
+      }),
+      this.prisma.transaction.create({
+        data: {
+          userId,
+          type: entry.type === 'PAYABLE' ? 'EXPENSE' : 'INCOME',
+          amount: entry.amount,
+          category: entry.category,
+          description: entry.description,
+          occurredAt: paidAt,
+        },
+      }),
+    ]);
 
     return { paid: true };
   }
@@ -127,11 +145,51 @@ export class FinanceService {
     return { deleted: true };
   }
 
-  async healthSummary(userId: string) {
-    await Promise.all([
-      this.markOverdue(userId),
-      this.transactions.materializeRecurring(userId),
+  /**
+   * Totais do mês. Realizado: transações (contas quitadas já viram transação).
+   * Previsto (ainda por vir): recorrências futuras + contas em aberto com vencimento no mês.
+   */
+  private async monthTotals(userId: string, start: Date, end: Date) {
+    // Também lança as ocorrências recorrentes vencidas antes de somar
+    const projected = await this.transactions.projectRecurring(
+      userId,
+      start,
+      end,
+    );
+
+    const [grouped, open] = await Promise.all([
+      this.prisma.transaction.groupBy({
+        by: ['type'],
+        where: { userId, occurredAt: { gte: start, lt: end } },
+        _sum: { amount: true },
+      }),
+      this.prisma.accountEntry.findMany({
+        where: {
+          userId,
+          status: { in: ['PENDING', 'OVERDUE'] },
+          dueDate: { gte: start, lt: end },
+        },
+        select: { type: true, amount: true },
+      }),
     ]);
+
+    const sum = (items: { amount: number }[]) =>
+      items.reduce((total, item) => total + item.amount, 0);
+
+    return {
+      income: grouped.find((g) => g.type === 'INCOME')?._sum.amount ?? 0,
+      expense: grouped.find((g) => g.type === 'EXPENSE')?._sum.amount ?? 0,
+      plannedIncome:
+        sum(projected.filter((tx) => tx.type === 'INCOME')) +
+        sum(open.filter((a) => a.type === 'RECEIVABLE')),
+      plannedExpense:
+        sum(projected.filter((tx) => tx.type === 'EXPENSE')) +
+        sum(open.filter((a) => a.type === 'PAYABLE')),
+    };
+  }
+
+  async healthSummary(userId: string) {
+    await this.markOverdue(userId);
 
     const now = new Date();
     const startMonth = new Date(
@@ -162,8 +220,8 @@ export class FinanceService {
       tasksDueToday,
       eventsToday,
       notesTotal,
-      txGrouped,
-      accountsDue,
+      totals,
+      accountsOpen,
     ] = await Promise.all([
       this.prisma.task.count({
         where: {
@@ -186,33 +244,23 @@ export class FinanceService {
         },
       }),
       this.prisma.note.count({ where: { userId } }),
-      this.prisma.transaction.groupBy({
-        by: ['type'],
-        where: {
-          userId,
-          occurredAt: { gte: startMonth, lt: endMonth },
-        },
-        _sum: { amount: true },
-      }),
+      this.monthTotals(userId, startMonth, endMonth),
+      // Em aberto: atrasadas + as que ainda vencem neste mês
       this.prisma.accountEntry.findMany({
         where: {
           userId,
           status: { in: ['PENDING', 'OVERDUE'] },
-          dueDate: { lte: endToday },
+          dueDate: { lt: endMonth },
         },
         select: { amount: true, type: true },
       }),
     ]);
 
-    const income = txGrouped.find((t) => t.type === 'INCOME')?._sum.amount ?? 0;
-    const expense =
-      txGrouped.find((t) => t.type === 'EXPENSE')?._sum.amount ?? 0;
-
-    const receivableOpen = accountsDue
+    const receivableOpen = accountsOpen
       .filter((a) => a.type === 'RECEIVABLE')
       .reduce((sum, item) => sum + item.amount, 0);
 
-    const payableOpen = accountsDue
+    const payableOpen = accountsOpen
       .filter((a) => a.type === 'PAYABLE')
       .reduce((sum, item) => sum + item.amount, 0);
 
@@ -221,9 +269,9 @@ export class FinanceService {
       tasksDueToday,
       eventsToday,
       notesTotal,
-      monthIncome: income,
-      monthExpense: expense,
-      monthBalance: income - expense,
+      monthIncome: totals.income,
+      monthExpense: totals.expense,
+      monthBalance: totals.income - totals.expense,
       receivableOpen,
       payableOpen,
     };
@@ -246,33 +294,15 @@ export class FinanceService {
         ? Math.max(now.getDate(), 1)
         : daysInMonth;
 
-    // Também lança as ocorrências recorrentes vencidas antes de somar
-    const projected = await this.transactions.projectRecurring(
-      userId,
-      startMonth,
-      endMonth,
-    );
-    const plannedExpense = projected
-      .filter((tx) => tx.type === 'EXPENSE')
-      .reduce((sum, tx) => sum + tx.amount, 0);
-
-    const grouped = await this.prisma.transaction.groupBy({
-      by: ['type'],
-      where: {
-        userId,
-        occurredAt: { gte: startMonth, lt: endMonth },
-      },
-      _sum: { amount: true },
-    });
-
-    const income = grouped.find((g) => g.type === 'INCOME')?._sum.amount ?? 0;
-    const expense = grouped.find((g) => g.type === 'EXPENSE')?._sum.amount ?? 0;
+    const { income, expense, plannedIncome, plannedExpense } =
+      await this.monthTotals(userId, startMonth, endMonth);
 
     const dailyExpenseAverage = elapsedDays > 0 ? expense / elapsedDays : 0;
     const projectedExpense = Math.max(
       dailyExpenseAverage * daysInMonth,
       expense + plannedExpense,
     );
+    const projectedIncome = income + plannedIncome;
 
     const startToday = new Date(now);
     startToday.setHours(0, 0, 0, 0);
@@ -300,9 +330,11 @@ export class FinanceService {
       year: targetYear,
       income,
       expense,
+      plannedIncome,
       plannedExpense,
+      projectedIncome,
       projectedExpense,
-      projectedBalance: income - projectedExpense,
+      projectedBalance: projectedIncome - projectedExpense,
       overdueCount,
       dueSoonCount,
       daysInMonth,

@@ -36,6 +36,7 @@ interface TransactionsSummary {
   income: number;
   expense: number;
   balance: number;
+  projectedBalance: number;
 }
 
 interface HealthSummary {
@@ -93,7 +94,8 @@ async function loadDashboard(key: number): Promise<DashboardData> {
   const [eventsRes, tasksRes, summaryRes, healthRes] = await Promise.allSettled([
     api.get<Event[]>("/events"),
     api.get<Task[]>("/tasks"),
-    api.get<TransactionsSummary>("/transactions/summary"),
+    // Mesma conta da tela de Finanças: inclui contas quitadas e a projeção do mês
+    api.get<Omit<TransactionsSummary, "balance">>("/finance/insights"),
     api.get<HealthSummary>("/finance/health-summary"),
   ]);
 
@@ -106,7 +108,7 @@ async function loadDashboard(key: number): Promise<DashboardData> {
     return null;
   };
 
-  const rawSummary = take(summaryRes, "summary", (d) => isRecord(d) && isNumeric(d.balance) && isNumeric(d.month));
+  const rawSummary = take(summaryRes, "summary", (d) => isRecord(d) && isNumeric(d.income) && isNumeric(d.expense) && isNumeric(d.month));
   const rawHealth = take(healthRes, "health", (d) => isRecord(d) && isNumeric(d.tasksOverdue));
 
   return {
@@ -118,7 +120,8 @@ async function loadDashboard(key: number): Promise<DashboardData> {
       year: rawSummary.year,
       income: Number(rawSummary.income),
       expense: Number(rawSummary.expense),
-      balance: Number(rawSummary.balance),
+      balance: Number(rawSummary.income) - Number(rawSummary.expense),
+      projectedBalance: Number(rawSummary.projectedBalance),
     },
     health: rawHealth && {
       ...rawHealth,
@@ -216,6 +219,7 @@ export function DashboardPage() {
     income: 0,
     expense: 0,
     balance: 0,
+    projectedBalance: 0,
   };
 
   // Se a API devolver mês/ano inválidos, cai no mês atual em vez de quebrar a tela
@@ -299,6 +303,11 @@ export function DashboardPage() {
                             ? "No azul este mês."
                             : "Gastos acima das receitas este mês."}
                       </p>
+                      {hasSummary && Number.isFinite(financialSummary.projectedBalance) && (
+                        <p className="mt-1 font-mono text-xs tabular-nums text-white/75">
+                          Projeção no fim do mês: {currencyFormatter.format(financialSummary.projectedBalance)}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </ShaderBackdrop>

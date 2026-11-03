@@ -155,6 +155,9 @@ interface FinanceInsights {
   year: number
   income: number
   expense: number
+  plannedIncome: number
+  plannedExpense: number
+  projectedIncome: number
   projectedExpense: number
   projectedBalance: number
   overdueCount: number
@@ -450,7 +453,7 @@ export function FinancePage() {
     try {
       await api.post(`/finance/accounts/${id}/pay`)
       await fetchTransactions()
-      toast.success('Lançamento marcado como pago')
+      toast.success('Pago! Lançado automaticamente em Transações')
     } catch {
       toast.error('Erro ao atualizar lançamento')
     } finally {
@@ -688,6 +691,32 @@ export function FinancePage() {
       />
 
       <Panel
+        title="Resumo do mês"
+        aside={<span className="label-tech capitalize">{selectedMonthLabel}</span>}
+      >
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Stat
+            label="Receitas"
+            value={currencyFormatter.format(insights?.income ?? 0)}
+            tone="success"
+            hint={`+ ${currencyFormatter.format(insights?.plannedIncome ?? 0)} previsto`}
+          />
+          <Stat
+            label="Despesas"
+            value={currencyFormatter.format(insights?.expense ?? 0)}
+            tone="signal"
+            hint={`+ ${currencyFormatter.format(insights?.plannedExpense ?? 0)} previsto`}
+          />
+          <Stat
+            label="Saldo projetado"
+            value={currencyFormatter.format(insights?.projectedBalance ?? 0)}
+            tone={(insights?.projectedBalance ?? 0) >= 0 ? "success" : "danger"}
+            hint="Inclui recorrências e contas em aberto do mês"
+          />
+        </div>
+      </Panel>
+
+      <Panel
         title="Despesas por categoria"
         aside={<span className="label-tech">{chartMonthLabel || "Mês atual"}</span>}
       >
@@ -798,35 +827,6 @@ export function FinancePage() {
       </Panel>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <Panel title="Projeção do mês">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Stat label="Despesa atual" value={currencyFormatter.format(insights?.expense ?? 0)} tone="signal" />
-            <Stat label="Despesa projetada" value={currencyFormatter.format(insights?.projectedExpense ?? 0)} tone="brand" />
-            <Stat
-              className="sm:col-span-2"
-              label="Saldo projetado"
-              value={currencyFormatter.format(insights?.projectedBalance ?? 0)}
-              tone={(insights?.projectedBalance ?? 0) >= 0 ? "success" : "danger"}
-              hint={`Baseado em ${insights?.elapsedDays ?? 0} de ${insights?.daysInMonth ?? 0} dias do mês`}
-            />
-          </div>
-        </Panel>
-
-        <Panel title="Alertas financeiros">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Stat
-              label="Contas atrasadas"
-              value={insights?.overdueCount ?? 0}
-              tone={(insights?.overdueCount ?? 0) > 0 ? "danger" : "success"}
-            />
-            <Stat
-              label="Vencendo em 7 dias"
-              value={insights?.dueSoonCount ?? 0}
-              tone={(insights?.dueSoonCount ?? 0) > 0 ? "signal" : "success"}
-            />
-          </div>
-        </Panel>
-
         <Panel title="Metas mensais" aside={<span className="label-tech capitalize">{selectedMonthLabel}</span>}>
           <p className="mb-3 text-xs text-muted-foreground">
             Defina um limite de gasto por categoria. A barra avança conforme você registra despesas
@@ -891,7 +891,23 @@ export function FinancePage() {
           </div>
         </Panel>
 
-        <Panel title="Contas a pagar e receber" aside={<span className="label-tech capitalize">{selectedMonthLabel}</span>}>
+        <Panel
+          title="Contas a pagar e receber"
+          aside={
+            (insights?.overdueCount ?? 0) + (insights?.dueSoonCount ?? 0) > 0 ? (
+              <span className="label-tech flex gap-3 tabular-nums">
+                {insights?.overdueCount ? <span className="text-destructive">{insights.overdueCount} atrasada(s)</span> : null}
+                {insights?.dueSoonCount ? <span className="text-signal">{insights.dueSoonCount} vence(m) em 7 dias</span> : null}
+              </span>
+            ) : (
+              <span className="label-tech capitalize">{selectedMonthLabel}</span>
+            )
+          }
+        >
+          <p className="mb-3 text-xs text-muted-foreground">
+            Contas futuras entram no saldo como previstas. Ao marcar como paga, ela vira uma
+            transação de hoje automaticamente &mdash; não precisa lançar de novo.
+          </p>
           <div className="grid gap-2 sm:grid-cols-2">
             <select className="arch-picker" value={accountType} onChange={(e) => setAccountType(e.target.value as 'PAYABLE' | 'RECEIVABLE')} aria-label="Tipo de lançamento">
               <option value="PAYABLE">A pagar</option>
